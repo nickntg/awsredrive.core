@@ -1,0 +1,15 @@
+﻿using System.Collections.Generic;
+using AWSRedrive.Interfaces;
+
+namespace AWSRedrive.Tests.Unit.Helpers
+{
+    public class SimpleConfigurationReader : IConfigurationReader
+    {
+        public List<ConfigurationEntry> Configs { get; set; }
+
+        public List<ConfigurationEntry> ReadConfiguration()
+        {
+            return Configs;
+        }
+    }
+}
