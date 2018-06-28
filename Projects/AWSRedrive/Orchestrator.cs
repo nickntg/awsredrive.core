@@ -36,11 +36,6 @@ namespace AWSRedrive
             _configurationChangeManager = configurationChangeManager;
         }
 
-        public Orchestrator()
-        {
-            
-        }
-
         public void Start()
         {
             _processors = new List<IQueueProcessor>();
