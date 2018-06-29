@@ -6,7 +6,7 @@ namespace AWSRedrive.Factories
     {
         public IQueueClient CreateClient(ConfigurationEntry configurationEntry)
         {
-            return null;
+            return new AwsQueueClient {ConfigurationEntry = configurationEntry};
         }
     }
 }
