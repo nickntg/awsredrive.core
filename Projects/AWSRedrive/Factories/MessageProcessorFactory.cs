@@ -6,7 +6,7 @@ namespace AWSRedrive.Factories
     {
         public IMessageProcessor CreateMessageProcessor()
         {
-            return null;
+            return new HttpMessageProcessor();
         }
     }
 }
