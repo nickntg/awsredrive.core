@@ -10,5 +10,6 @@
         public string RedriveUrl { get; set; }
         public string AwsGatewayToken { get; set; }
         public bool Active { get; set; }
+        public int? Timeout { get; set; }
     }
 }
