@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using System.Threading.Tasks;
 using Amazon;
 using Amazon.SQS;
 using Amazon.SQS.Model;
@@ -32,6 +33,11 @@ namespace AWSRedrive
 
         public IMessage GetMessage()
         {
+            return GetMessageInternal().Result;
+        }
+
+        private async Task<IMessage> GetMessageInternal()
+        {
             var request = new ReceiveMessageRequest
             {
                 MaxNumberOfMessages = 1,
@@ -39,22 +45,37 @@ namespace AWSRedrive
                 WaitTimeSeconds = 20
             };
 
-            using (var source = new CancellationTokenSource(20*1000))
+            using (var source = new CancellationTokenSource(20 * 1000))
             {
-                var response = _client.ReceiveMessageAsync(request, source.Token);
-                source.Token.WaitHandle.WaitOne();
-
-                if (response?.Result?.Messages?.Count >= 1)
+                try
                 {
-                    return new SqsMessage(response.Result.Messages[0].ReceiptHandle,
-                        response.Result.Messages[0].Body);
-                }
+                    var response = await _client.ReceiveMessageAsync(request, source.Token);
+                    if (response?.Messages?.Count >= 1)
+                    {
+                        return new SqsMessage(response.Messages[0].ReceiptHandle,
+                            response.Messages[0].Body);
+                    }
 
-                return null;
+                    return null;
+                }
+                catch (OperationCanceledException)
+                {
+                    if (source.Token.IsCancellationRequested)
+                    {
+                        return null;
+                    }
+
+                    throw;
+                }
             }
         }
 
         public void DeleteMessage(IMessage message)
+        {
+            DeleteMessageInternal(message);
+        }
+
+        private async void DeleteMessageInternal(IMessage message)
         {
             var request = new DeleteMessageRequest
             {
@@ -62,10 +83,9 @@ namespace AWSRedrive
                 ReceiptHandle = message.MessageIdentifier
             };
 
-            using (var source = new CancellationTokenSource())
+            using (var source = new CancellationTokenSource(20 * 1000))
             {
-                _client.DeleteMessageAsync(request, source.Token);
-                source.Token.WaitHandle.WaitOne();
+                await _client.DeleteMessageAsync(request, source.Token);
             }
         }
 
