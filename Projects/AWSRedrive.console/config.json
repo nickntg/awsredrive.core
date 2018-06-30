@@ -1,1 +1,10 @@
-﻿[]
+﻿[
+  {
+    "Alias": "#1",
+    "QueueUrl": "https://sqs.eu-west-1.amazonaws.com/accountid/inputqueue1",
+    "RedriveUrl": "http://nohost.com/",
+    "Region": "eu-west-1",
+    "Active": true,
+    "Timeout": 10000
+  }
+]
