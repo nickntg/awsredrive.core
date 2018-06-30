@@ -59,7 +59,7 @@ namespace AWSRedrive.Tests.Unit
             mockProcessor.Setup(x => x.Init(It.IsAny<IQueueClient>(), It.IsAny<IMessageProcessor>(), It.IsAny<ConfigurationEntry>())).Verifiable();
 
             var mockProcesorFactory = new Mock<IQueueProcessorFactory>(MockBehavior.Strict);
-            mockProcesorFactory.Setup(x => x.CreateQueueProcessor(It.IsAny<IQueueClient>(), It.IsAny<IMessageProcessor>(), It.IsAny<ConfigurationEntry>())).Returns(mockProcessor.Object).Verifiable();
+            mockProcesorFactory.Setup(x => x.CreateQueueProcessor()).Returns(mockProcessor.Object).Verifiable();
 
             var mockClient = new Mock<IQueueClient>(MockBehavior.Strict);
 
@@ -78,7 +78,7 @@ namespace AWSRedrive.Tests.Unit
 
             mockClientFactory.Verify(x => x.CreateClient(It.IsAny<ConfigurationEntry>()), Times.Exactly(1));
             mockMessageProcessorFactory.Verify(x => x.CreateMessageProcessor(), Times.Exactly(1));
-            mockProcesorFactory.Verify(x => x.CreateQueueProcessor(It.IsAny<IQueueClient>(), It.IsAny<IMessageProcessor>(), It.IsAny<ConfigurationEntry>()), Times.Exactly(1));
+            mockProcesorFactory.Verify(x => x.CreateQueueProcessor(), Times.Exactly(1));
             mockProcessor.Verify(x => x.Start(), Times.Exactly(1));
             mockProcessor.Verify(x => x.Init(It.IsAny<IQueueClient>(), It.IsAny<IMessageProcessor>(), It.IsAny<ConfigurationEntry>()), Times.Exactly(1));
         }
@@ -113,7 +113,7 @@ namespace AWSRedrive.Tests.Unit
             mockNewProcessor.Setup(x =>x.Init(It.IsAny<IQueueClient>(), It.IsAny<IMessageProcessor>(), It.IsAny<ConfigurationEntry>())).Verifiable();
 
             var mockProcesorFactory = new Mock<IQueueProcessorFactory>(MockBehavior.Strict);
-            mockProcesorFactory.Setup(x => x.CreateQueueProcessor(It.IsAny<IQueueClient>(), It.IsAny<IMessageProcessor>(), It.IsAny<ConfigurationEntry>())).Returns(mockNewProcessor.Object).Verifiable();
+            mockProcesorFactory.Setup(x => x.CreateQueueProcessor()).Returns(mockNewProcessor.Object).Verifiable();
 
             var mockClient = new Mock<IQueueClient>(MockBehavior.Strict);
 
@@ -138,7 +138,7 @@ namespace AWSRedrive.Tests.Unit
 
             mockClientFactory.Verify(x => x.CreateClient(It.IsAny<ConfigurationEntry>()), Times.Exactly(1));
             mockMessageProcessorFactory.Verify(x => x.CreateMessageProcessor(), Times.Exactly(1));
-            mockProcesorFactory.Verify(x => x.CreateQueueProcessor(It.IsAny<IQueueClient>(), It.IsAny<IMessageProcessor>(), It.IsAny<ConfigurationEntry>()), Times.Exactly(1));
+            mockProcesorFactory.Verify(x => x.CreateQueueProcessor(), Times.Exactly(1));
             mockNewProcessor.Verify(x => x.Start(), Times.Exactly(1));
             mockNewProcessor.Verify(x => x.Init(It.IsAny<IQueueClient>(), It.IsAny<IMessageProcessor>(), It.IsAny<ConfigurationEntry>()), Times.Exactly(1));
             mockExistingProcessor.VerifyGet(x => x.Configuration, Times.AtLeastOnce());
