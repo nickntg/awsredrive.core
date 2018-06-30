@@ -45,6 +45,7 @@ namespace AWSRedrive
                     var queueClient = queueClientFactory.CreateClient(config);
                     var messageProcessor = messageProcessorFactory.CreateMessageProcessor();
                     var queueProcessor = queueProcessorFactory.CreateQueueProcessor(queueClient, messageProcessor, config);
+                    queueProcessor.Init(queueClient, messageProcessor, config);
                     toAdd.Add(queueProcessor);
                 }
             }
