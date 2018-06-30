@@ -53,7 +53,7 @@ namespace AWSRedrive
             try
             {
                 _cancellation.Cancel();
-                _cancellation.Token.WaitHandle.WaitOne(30 * 1000);
+                Task.WaitAll(new[] {_task}, 30 * 1000);
                 _cancellation.Dispose();
                 _task.Dispose();
             }
@@ -71,11 +71,21 @@ namespace AWSRedrive
         {
             while (!_cancellation.IsCancellationRequested)
             {
-                Logger.Debug($"Waiting for message, queue processor [{Configuration.Alias}]");
-                var msg = _queueClient.GetMessage();
-                if (msg == null)
+                IMessage msg;
+
+                try
                 {
-                    Logger.Debug($"No message received, queue processor [{Configuration.Alias}]");
+                    Logger.Debug($"Waiting for message, queue processor [{Configuration.Alias}]");
+                    msg = _queueClient.GetMessage();
+                    if (msg == null)
+                    {
+                        Logger.Debug($"No message received, queue processor [{Configuration.Alias}]");
+                        continue;
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logger.Error($"Queue processor [{Configuration.Alias}], error waiting for queue message - {e}");
                     continue;
                 }
 
@@ -94,28 +104,28 @@ namespace AWSRedrive
                     Logger.Debug($"Processing complete, queue processor [{Configuration.Alias}]");
 
                     _messagesSent++;
+
+                    try
+                    {
+                        Logger.Debug($"Deleting message, queue processor [{Configuration.Alias}], id [{msg.MessageIdentifier}]");
+                        _queueClient.DeleteMessage(msg);
+                        Logger.Debug($"Message deleted, queue processor [{Configuration.Alias}], id [{msg.MessageIdentifier}]");
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Error($"Could not delete message [{msg.MessageIdentifier}, queue processor [{Configuration.Alias}] - MESSAGE REMAINS IN QUEUE! - {e}");
+                    }
                 }
                 catch (Exception e)
                 {
                     _messagesFailed++;
 
-                    Logger.Error($"Error processing message [{msg.MessageIdentifier}, queue processor [{Configuration.Alias}] - {e}");
-                    Logger.Error($"Message [{msg.MessageIdentifier}, queue processor [{Configuration.Alias}] follows \r\n{msg.Content}");
+                    Logger.Error($"Error processing message [{msg.MessageIdentifier}[, queue processor [{Configuration.Alias}] - {e}");
+                    Logger.Error($"Message [{msg.MessageIdentifier}[, queue processor [{Configuration.Alias}] follows \r\n{msg.Content}");
                 }
                 finally
                 {
                     Logger.Info($"Queue processor [{Configuration.Alias}], messages received {_messagesReceived}, sent {_messagesSent}, failed {_messagesFailed}");
-                }
-
-                try
-                {
-                    Logger.Debug($"Deleting message, queue processor [{Configuration.Alias}, id [{msg.MessageIdentifier}");
-                    _queueClient.DeleteMessage(msg);
-                    Logger.Debug($"Message deleted, queue processor [{Configuration.Alias}, id [{msg.MessageIdentifier}");
-                }
-                catch (Exception e)
-                {
-                    Logger.Error($"Could not delete message [{msg.MessageIdentifier}, queue processor [{Configuration.Alias}] - MESSAGE REMAINS IN QUEUE! - {e}");
                 }
             }
         }
