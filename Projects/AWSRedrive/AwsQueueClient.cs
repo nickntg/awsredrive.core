@@ -11,9 +11,9 @@ namespace AWSRedrive
     {
         public ConfigurationEntry ConfigurationEntry { get; set; }
 
-        private readonly IAmazonSQS _client;
+        private IAmazonSQS _client;
 
-        public AwsQueueClient()
+        public void Init()
         {
             if (string.IsNullOrEmpty(ConfigurationEntry.AccessKey) &&
                 string.IsNullOrEmpty(ConfigurationEntry.SecretKey))
@@ -24,7 +24,7 @@ namespace AWSRedrive
             else
             {
                 // Explicit AWS credentials.
-                _client = new AmazonSQSClient(ConfigurationEntry.AccessKey, 
+                _client = new AmazonSQSClient(ConfigurationEntry.AccessKey,
                     ConfigurationEntry.SecretKey,
                     RegionEndpoint.GetBySystemName(ConfigurationEntry.Region));
             }
@@ -39,7 +39,7 @@ namespace AWSRedrive
                 WaitTimeSeconds = 20
             };
 
-            using (var source = new CancellationTokenSource())
+            using (var source = new CancellationTokenSource(20*1000))
             {
                 var response = _client.ReceiveMessageAsync(request, source.Token);
                 source.Token.WaitHandle.WaitOne();

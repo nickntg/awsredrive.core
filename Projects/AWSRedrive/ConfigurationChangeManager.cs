@@ -6,7 +6,7 @@ namespace AWSRedrive
 {
     public class ConfigurationChangeManager : IConfigurationChangeManager
     {
-        private static readonly Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         public void ReadChanges(IConfigurationReader configurationReader, 
             List<IQueueProcessor> processors,
@@ -35,7 +35,7 @@ namespace AWSRedrive
                              (config.AwsGatewayToken == processor.Configuration.AwsGatewayToken) &&
                              (config.QueueUrl == processor.Configuration.QueueUrl) &&
                              (config.RedriveUrl == processor.Configuration.RedriveUrl) &&
-                             (config.Region == processor.Configuration.RedriveUrl) &&
+                             (config.Region == processor.Configuration.Region) &&
                              (config.SecretKey == processor.Configuration.SecretKey));
                 }
 
@@ -43,6 +43,7 @@ namespace AWSRedrive
                 {
                     Logger.Debug($"Creating new queueprocessor for queue [{config.QueueUrl}], url [{config.RedriveUrl}], alias [{config.Alias}]");
                     var queueClient = queueClientFactory.CreateClient(config);
+                    queueClient.Init();
                     var messageProcessor = messageProcessorFactory.CreateMessageProcessor();
                     var queueProcessor = queueProcessorFactory.CreateQueueProcessor();
                     queueProcessor.Init(queueClient, messageProcessor, config);
@@ -64,7 +65,7 @@ namespace AWSRedrive
                              (config.AwsGatewayToken == processor.Configuration.AwsGatewayToken) &&
                              (config.QueueUrl == processor.Configuration.QueueUrl) &&
                              (config.RedriveUrl == processor.Configuration.RedriveUrl) &&
-                             (config.Region == processor.Configuration.RedriveUrl) &&
+                             (config.Region == processor.Configuration.Region) &&
                              (config.SecretKey == processor.Configuration.SecretKey) &&
                              (config.Active));
                     if (found)
