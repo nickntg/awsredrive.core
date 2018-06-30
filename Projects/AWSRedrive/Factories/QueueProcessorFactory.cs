@@ -4,10 +4,9 @@ namespace AWSRedrive.Factories
 {
     public class QueueProcessorFactory : IQueueProcessorFactory
     {
-        public IQueueProcessor CreateQueueProcessor(IQueueClient queueClient, IMessageProcessor messageProcessor,
-            ConfigurationEntry configuration)
+        public IQueueProcessor CreateQueueProcessor()
         {
-            return null;
+            return new QueueProcessor();
         }
     }
 }
