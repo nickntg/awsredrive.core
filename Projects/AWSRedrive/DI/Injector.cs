@@ -20,6 +20,8 @@ namespace AWSRedrive.DI
             Container = services.BuildServiceProvider();
         }
 
+        protected Injector() { }
+
         public static IOrchestrator GetOrchestrator()
         {
             return Container.GetService<IOrchestrator>();
