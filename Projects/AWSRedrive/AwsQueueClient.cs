@@ -33,10 +33,10 @@ namespace AWSRedrive
 
         public IMessage GetMessage()
         {
-            return GetMessageInternal().Result;
+            return GetMessageInternalAsync().Result;
         }
 
-        private async Task<IMessage> GetMessageInternal()
+        private async Task<IMessage> GetMessageInternalAsync()
         {
             var request = new ReceiveMessageRequest
             {
@@ -72,10 +72,10 @@ namespace AWSRedrive
 
         public void DeleteMessage(IMessage message)
         {
-            DeleteMessageInternal(message);
+            DeleteMessageInternalAsync(message);
         }
 
-        private async void DeleteMessageInternal(IMessage message)
+        private async void DeleteMessageInternalAsync(IMessage message)
         {
             var request = new DeleteMessageRequest
             {
