@@ -12,5 +12,7 @@ namespace AWSRedrive.console
             Console.ReadLine();
             orchestrator.Stop();
         }
+
+        protected Program() { }
     }
 }
