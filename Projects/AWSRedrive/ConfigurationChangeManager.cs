@@ -19,6 +19,42 @@ namespace AWSRedrive
             /*
              * First, create processors to add.
             */
+            var toAdd = FindConfigsToAdd(configurations, 
+                processors, 
+                queueClientFactory, 
+                messageProcessorFactory,
+                queueProcessorFactory);
+
+            /*
+             * Second, find processors to remove.
+             */
+            var toRemove = FindEntriesToRemove(configurations, processors);
+
+            /*
+             * Now remove those for removal and add the new ones.
+             */
+
+            foreach (var processor in toRemove)
+            {
+                Logger.Info($"Stopping queueprocessor for queue [{processor.Configuration.QueueUrl}], url [{processor.Configuration.RedriveUrl}], alias [{processor.Configuration.Alias}]");
+                processor.Stop();
+                processors.Remove(processor);
+            }
+
+            foreach (var processor in toAdd)
+            {
+                Logger.Info($"Starting new queueprocessor for queue [{processor.Configuration.QueueUrl}], url [{processor.Configuration.RedriveUrl}], alias [{processor.Configuration.Alias}]");
+                processor.Start();
+                processors.Add(processor);
+            }
+        }
+
+        private List<IQueueProcessor> FindConfigsToAdd(List<ConfigurationEntry> configurations,
+    List<IQueueProcessor> processors,
+    IQueueClientFactory queueClientFactory,
+    IMessageProcessorFactory messageProcessorFactory,
+    IQueueProcessorFactory queueProcessorFactory)
+        {
             var toAdd = new List<IQueueProcessor>();
             foreach (var config in configurations)
             {
@@ -51,9 +87,12 @@ namespace AWSRedrive
                 }
             }
 
-            /*
-             * Second, find processors to remove.
-             */
+            return toAdd;
+        }
+
+        private List<IQueueProcessor> FindEntriesToRemove(List<ConfigurationEntry> configurations,
+            List<IQueueProcessor> processors)
+        {
             var toRemove = new List<IQueueProcessor>();
             foreach (var processor in processors)
             {
@@ -80,23 +119,7 @@ namespace AWSRedrive
                 }
             }
 
-            /*
-             * Now remove those for removal and add the new ones.
-             */
-
-            foreach (var processor in toRemove)
-            {
-                Logger.Info($"Stopping queueprocessor for queue [{processor.Configuration.QueueUrl}], url [{processor.Configuration.RedriveUrl}], alias [{processor.Configuration.Alias}]");
-                processor.Stop();
-                processors.Remove(processor);
-            }
-
-            foreach (var processor in toAdd)
-            {
-                Logger.Info($"Starting new queueprocessor for queue [{processor.Configuration.QueueUrl}], url [{processor.Configuration.RedriveUrl}], alias [{processor.Configuration.Alias}]");
-                processor.Start();
-                processors.Add(processor);
-            }
+            return toRemove;
         }
     }
 }
