@@ -13,7 +13,7 @@ namespace AWSRedrive
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         private IQueueClient _queueClient;
-        private IMessageProcessor _messageProcessor;
+        private IMessageProcessorFactory _messageProcessorFactory;
         private Task _task;
         private CancellationTokenSource _cancellation;
         private int _messagesReceived;
@@ -21,12 +21,12 @@ namespace AWSRedrive
         private int _messagesFailed;
 
         public void Init(IQueueClient queueClient, 
-            IMessageProcessor messageProcessor, 
+            IMessageProcessorFactory messageProcessorFactory, 
             ConfigurationEntry configuration)
         {
             Configuration = configuration;
             _queueClient = queueClient;
-            _messageProcessor = messageProcessor;
+            _messageProcessorFactory = messageProcessorFactory;
         }
 
         public void Start()
@@ -100,7 +100,9 @@ namespace AWSRedrive
                 try
                 {
                     Logger.Debug($"Processing message, queue processor [{Configuration.Alias}], url {Configuration.RedriveUrl}");
-                    _messageProcessor.ProcessMessage(msg.Content, Configuration);
+                    var messageProcessor = _messageProcessorFactory.CreateMessageProcessor(Configuration);
+                    Logger.Debug($"Using {messageProcessor.GetType()} processor");
+                    messageProcessor.ProcessMessage(msg.Content, Configuration);
                     Logger.Debug($"Processing complete, queue processor [{Configuration.Alias}]");
 
                     _messagesSent++;

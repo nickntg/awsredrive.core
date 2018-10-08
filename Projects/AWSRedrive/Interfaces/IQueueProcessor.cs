@@ -4,7 +4,7 @@
     {
         ConfigurationEntry Configuration { get; set; }
         void Init(IQueueClient queueClient,
-            IMessageProcessor messageProcessor,
+            IMessageProcessorFactory messageProcessorFactory,
             ConfigurationEntry configuration
         );
         void Start();

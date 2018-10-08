@@ -4,9 +4,11 @@ namespace AWSRedrive.Factories
 {
     public class MessageProcessorFactory : IMessageProcessorFactory
     {
-        public IMessageProcessor CreateMessageProcessor()
+        public IMessageProcessor CreateMessageProcessor(ConfigurationEntry configuration)
         {
-            return new HttpMessageProcessor();
+            return string.IsNullOrEmpty(configuration.RedriveUrl)
+                ? (IMessageProcessor) new PowerShellMessageProcessor()
+                : (IMessageProcessor) new HttpMessageProcessor();
         }
     }
 }

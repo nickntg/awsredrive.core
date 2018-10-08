@@ -80,9 +80,8 @@ namespace AWSRedrive
                     Logger.Debug($"Creating new queueprocessor for queue [{config.QueueUrl}], url [{config.RedriveUrl}], alias [{config.Alias}]");
                     var queueClient = queueClientFactory.CreateClient(config);
                     queueClient.Init();
-                    var messageProcessor = messageProcessorFactory.CreateMessageProcessor();
                     var queueProcessor = queueProcessorFactory.CreateQueueProcessor();
-                    queueProcessor.Init(queueClient, messageProcessor, config);
+                    queueProcessor.Init(queueClient, messageProcessorFactory, config);
                     toAdd.Add(queueProcessor);
                 }
             }

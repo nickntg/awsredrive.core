@@ -32,9 +32,11 @@ namespace AWSRedrive.Tests.Unit
             var messageProcessorMock = new Mock<IMessageProcessor>(MockBehavior.Strict);
             messageProcessorMock.Setup(x => x.ProcessMessage(It.IsAny<string>(), It.IsAny<ConfigurationEntry>())).Verifiable();
             queueClientMock.Setup(x => x.DeleteMessage(It.IsAny<IMessage>())).Callback(() => Thread.Sleep(2000));
+            var processorFactoryMock = new Mock<IMessageProcessorFactory>(MockBehavior.Strict);
+            processorFactoryMock.Setup(x => x.CreateMessageProcessor(It.IsAny<ConfigurationEntry>())).Returns(messageProcessorMock.Object).Verifiable();
 
             var processor = new QueueProcessor();
-            processor.Init(queueClientMock.Object, messageProcessorMock.Object, configuration);
+            processor.Init(queueClientMock.Object, processorFactoryMock.Object, configuration);
             processor.Start();
             Thread.Sleep(1000);
             processor.Stop();
@@ -42,6 +44,7 @@ namespace AWSRedrive.Tests.Unit
             queueClientMock.Verify(x => x.GetMessage(), Times.Exactly(1));
             messageProcessorMock.Verify(x => x.ProcessMessage(It.IsAny<string>(), It.IsAny<ConfigurationEntry>()),Times.Exactly(1));
             queueClientMock.Verify(x => x.DeleteMessage(It.IsAny<IMessage>()), Times.Exactly(1));
+            processorFactoryMock.Verify(x => x.CreateMessageProcessor(It.IsAny<ConfigurationEntry>()), Times.Exactly(1));
         }
     }
 }

@@ -9,6 +9,9 @@
     <PackageReference Include="AWSSDK.SQS" Version="3.3.3.22" />
     <PackageReference Include="FluentValidation" Version="7.6.103" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="2.1.1" />
+    <PackageReference Include="Microsoft.PowerShell.Commands.Diagnostics" Version="6.1.0" />
+    <PackageReference Include="Microsoft.PowerShell.SDK" Version="6.1.0" />
+    <PackageReference Include="Microsoft.WSMan.Management" Version="6.1.0" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
     <PackageReference Include="NLog" Version="4.5.10" />
     <PackageReference Include="RestSharp" Version="106.5.2" />

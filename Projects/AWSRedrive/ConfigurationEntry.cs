@@ -8,6 +8,7 @@
         public string QueueUrl { get; set; }
         public string Region { get; set; }
         public string RedriveUrl { get; set; }
+        public string RedriveScript { get; set; }
         public string AwsGatewayToken { get; set; }
         public bool Active { get; set; }
         public int? Timeout { get; set; }

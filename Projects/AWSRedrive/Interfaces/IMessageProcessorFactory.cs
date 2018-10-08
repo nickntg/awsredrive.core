@@ -2,6 +2,6 @@
 {
     public interface IMessageProcessorFactory
     {
-        IMessageProcessor CreateMessageProcessor();
+        IMessageProcessor CreateMessageProcessor(ConfigurationEntry configuration);
     }
 }
