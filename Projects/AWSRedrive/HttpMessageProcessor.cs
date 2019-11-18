@@ -14,9 +14,9 @@ namespace AWSRedrive
         {
             Logger.Trace($"Preparing post to {configurationEntry.RedriveUrl}");
             var uri = new Uri(configurationEntry.RedriveUrl);
-            var client = new RestClient($"{uri.Scheme}://{uri.Host}");
+            var client = new RestClient($"{uri.Scheme}://{uri.Host}:{uri.Port}");
             var post = new RestRequest(uri.PathAndQuery, Method.POST);
-            post.AddBody(message);
+            post.AddParameter("application/json", message, ParameterType.RequestBody);
 
             if (!string.IsNullOrEmpty(configurationEntry.AwsGatewayToken))
             {
