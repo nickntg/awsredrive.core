@@ -158,6 +158,44 @@ namespace AWSRedrive.Tests.Unit
             mockExistingProcessor.Verify(x => x.Stop(), Times.Exactly(1));
         }
 
+        [Fact]
+        public void DoesNothingWithUnchangedConfigurationEntries()
+        {
+            var configChangeManager = new ConfigurationChangeManager();
+            var config = new SimpleConfigurationReader
+            {
+                Configs = new List<ConfigurationEntry>
+                {
+                    GetOneConfigurationEntry("#1", true),
+                    GetOneConfigurationEntry("#2", true),
+                    GetOneConfigurationEntry("#3", true)
+                }
+            };
+
+            var mockedProcessors = new List<Mock<IQueueProcessor>>
+            {
+                GetOneMockedProcessor(config.Configs[0]),
+                GetOneMockedProcessor(config.Configs[1]),
+                GetOneMockedProcessor(config.Configs[2])
+            };
+
+            var processors = new List<IQueueProcessor>
+            {
+                mockedProcessors[0].Object,
+                mockedProcessors[1].Object,
+                mockedProcessors[2].Object
+            };
+
+            configChangeManager.ReadChanges(config, processors, null, null, null);
+            Assert.NotNull(processors);
+            Assert.Equal(3, processors.Count);
+
+            foreach (var processor in mockedProcessors)
+            {
+                processor.VerifyGet(x => x.Configuration, Times.Exactly(16));
+            }
+        }
+
         private static ConfigurationEntry GetOneConfigurationEntry(string alias, bool active)
         {
             return new ConfigurationEntry
@@ -171,6 +209,13 @@ namespace AWSRedrive.Tests.Unit
                 SecretKey = null,
                 Region = null
             };
+        }
+
+        private static Mock<IQueueProcessor> GetOneMockedProcessor(ConfigurationEntry config)
+        {
+            var mockNewProcessor = new Mock<IQueueProcessor>(MockBehavior.Strict);
+            mockNewProcessor.SetupGet(x => x.Configuration).Returns(config);
+            return mockNewProcessor;
         }
     }
 }
