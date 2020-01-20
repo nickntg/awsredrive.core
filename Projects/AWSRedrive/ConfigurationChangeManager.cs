@@ -73,6 +73,10 @@ namespace AWSRedrive
                              (config.RedriveUrl == processor.Configuration.RedriveUrl) &&
                              (config.Region == processor.Configuration.Region) &&
                              (config.SecretKey == processor.Configuration.SecretKey));
+                    if (found)
+                    {
+                        break;
+                    }
                 }
 
                 if (!found)
