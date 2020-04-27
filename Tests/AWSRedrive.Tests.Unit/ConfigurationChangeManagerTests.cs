@@ -192,7 +192,7 @@ namespace AWSRedrive.Tests.Unit
 
             foreach (var processor in mockedProcessors)
             {
-                processor.VerifyGet(x => x.Configuration, Times.Exactly(16));
+                processor.VerifyGet(x => x.Configuration, Times.Exactly(18));
             }
         }
 
@@ -206,6 +206,7 @@ namespace AWSRedrive.Tests.Unit
                 RedriveUrl = alias,
                 QueueUrl = alias,
                 AwsGatewayToken = null,
+                AuthToken = null,
                 SecretKey = null,
                 Region = null
             };

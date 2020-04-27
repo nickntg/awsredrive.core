@@ -69,6 +69,7 @@ namespace AWSRedrive
                     found = ((config.Alias == processor.Configuration.Alias) &&
                              (config.AccessKey == processor.Configuration.AccessKey) &&
                              (config.AwsGatewayToken == processor.Configuration.AwsGatewayToken) &&
+                             (config.AuthToken == processor.Configuration.AuthToken) &&
                              (config.QueueUrl == processor.Configuration.QueueUrl) &&
                              (config.RedriveUrl == processor.Configuration.RedriveUrl) &&
                              (config.Region == processor.Configuration.Region) &&
@@ -105,6 +106,7 @@ namespace AWSRedrive
                     found = ((config.Alias == processor.Configuration.Alias) &&
                              (config.AccessKey == processor.Configuration.AccessKey) &&
                              (config.AwsGatewayToken == processor.Configuration.AwsGatewayToken) &&
+                             (config.AuthToken == processor.Configuration.AuthToken) &&
                              (config.QueueUrl == processor.Configuration.QueueUrl) &&
                              (config.RedriveUrl == processor.Configuration.RedriveUrl) &&
                              (config.Region == processor.Configuration.Region) &&

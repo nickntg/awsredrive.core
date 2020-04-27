@@ -23,6 +23,11 @@ namespace AWSRedrive
                 post.AddHeader("x-api-key", configurationEntry.AwsGatewayToken);
             }
 
+            if (!string.IsNullOrEmpty(configurationEntry.AuthToken))
+            {
+                post.AddHeader("Authorization", configurationEntry.AuthToken);
+            }
+
             if (configurationEntry.Timeout.HasValue)
             {
                 client.Timeout = configurationEntry.Timeout.Value;
