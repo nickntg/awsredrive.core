@@ -31,7 +31,8 @@ namespace AWSRedrive
             Logger.Trace($"Posting to {configurationEntry.RedriveUrl}");
             var response = client.Execute(post);
 
-            if (response.IsSuccessful && response.StatusCode == HttpStatusCode.OK)
+            if (response.IsSuccessful && 
+                (response.StatusCode == HttpStatusCode.OK || response.StatusCode == HttpStatusCode.Created)) 
             {
                 Logger.Trace($"Post to {configurationEntry.RedriveUrl} successful");
                 return;
