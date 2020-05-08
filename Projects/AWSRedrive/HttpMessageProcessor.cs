@@ -49,7 +49,7 @@ namespace AWSRedrive
                 throw response.ErrorException;
             }
 
-            throw new InvalidOperationException($"Received {response.StatusCode} status code");
+            throw new InvalidOperationException($"Received {response.StatusCode} status code with content [{response.Content}]");
         }
     }
 }
