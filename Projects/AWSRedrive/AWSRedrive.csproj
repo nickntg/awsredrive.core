@@ -1,19 +1,20 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp2.2</TargetFramework>
+    <TargetFramework>net5.0</TargetFramework>
 	<ProjectGuid>{E2CEBBAF-6DF7-41E9-815D-9AD4CF90C844}</ProjectGuid>
+	<Version>1.01</Version>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="AWSSDK.SQS" Version="3.3.102.51" />
-    <PackageReference Include="FluentValidation" Version="8.6.1" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="2.2.0" />
-    <PackageReference Include="Microsoft.PowerShell.Commands.Diagnostics" Version="6.2.3" />
-    <PackageReference Include="Microsoft.PowerShell.SDK" Version="6.2.3" />
-    <PackageReference Include="Microsoft.WSMan.Management" Version="6.2.3" />
-    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
-    <PackageReference Include="NLog" Version="4.6.8" />
+    <PackageReference Include="AWSSDK.SQS" Version="3.7.1.24" />
+    <PackageReference Include="FluentValidation" Version="10.3.3" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="5.0.2" />
+    <PackageReference Include="Microsoft.PowerShell.Commands.Diagnostics" Version="7.1.4" />
+    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.1.4" />
+    <PackageReference Include="Microsoft.WSMan.Management" Version="7.1.4" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="NLog" Version="4.7.11" />
     <PackageReference Include="RestSharp" Version="106.12.0" />
   </ItemGroup>
 
