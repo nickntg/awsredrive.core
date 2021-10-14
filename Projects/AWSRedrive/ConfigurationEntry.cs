@@ -11,8 +11,11 @@
         public string RedriveScript { get; set; }
         public string AwsGatewayToken { get; set; }
         public string AuthToken { get; set; }
+        public string BasicAuthUserName { get; set; }
+        public string BasicAuthPassword { get; set; }
         public bool Active { get; set; }
         public bool UsePUT { get; set; }
         public int? Timeout { get; set; }
+        public bool IgnoreCertificateErrors { get; set; }
     }
 }
