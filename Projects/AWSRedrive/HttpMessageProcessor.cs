@@ -3,6 +3,7 @@ using System.Net;
 using AWSRedrive.Interfaces;
 using NLog;
 using RestSharp;
+using RestSharp.Authenticators;
 
 namespace AWSRedrive
 {
@@ -26,6 +27,13 @@ namespace AWSRedrive
             if (!string.IsNullOrEmpty(configurationEntry.AuthToken))
             {
                 post.AddHeader("Authorization", configurationEntry.AuthToken);
+            }
+
+            if (!string.IsNullOrEmpty(configurationEntry.BasicAuthPassword) &&
+                !string.IsNullOrEmpty(configurationEntry.BasicAuthUserName))
+            {
+                client.Authenticator = new HttpBasicAuthenticator(configurationEntry.BasicAuthUserName,
+                    configurationEntry.BasicAuthPassword);
             }
 
             if (configurationEntry.Timeout.HasValue)
