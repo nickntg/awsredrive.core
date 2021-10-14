@@ -36,6 +36,11 @@ namespace AWSRedrive
                     configurationEntry.BasicAuthPassword);
             }
 
+            if (configurationEntry.IgnoreCertificateErrors)
+            {
+                client.RemoteCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
+            }
+
             if (configurationEntry.Timeout.HasValue)
             {
                 client.Timeout = configurationEntry.Timeout.Value;
