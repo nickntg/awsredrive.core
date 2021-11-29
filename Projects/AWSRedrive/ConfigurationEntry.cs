@@ -17,5 +17,6 @@
         public bool UsePUT { get; set; }
         public int? Timeout { get; set; }
         public bool IgnoreCertificateErrors { get; set; }
+        public string ServiceUrl { get; set; }
     }
 }

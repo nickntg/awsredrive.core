@@ -16,18 +16,28 @@ namespace AWSRedrive
 
         public void Init()
         {
+            var config = new AmazonSQSConfig();
+            if (!string.IsNullOrEmpty(ConfigurationEntry.ServiceUrl))
+            {
+                config.ServiceURL = ConfigurationEntry.ServiceUrl;
+            }
+            else
+            {
+                config.RegionEndpoint = RegionEndpoint.GetBySystemName(ConfigurationEntry.Region);
+            }
+
             if (string.IsNullOrEmpty(ConfigurationEntry.AccessKey) &&
                 string.IsNullOrEmpty(ConfigurationEntry.SecretKey))
             {
                 // AWS credentials set either in configuration or for the machine running this.
-                _client = new AmazonSQSClient(RegionEndpoint.GetBySystemName(ConfigurationEntry.Region));
+                _client = new AmazonSQSClient(config);
             }
             else
             {
                 // Explicit AWS credentials.
                 _client = new AmazonSQSClient(ConfigurationEntry.AccessKey,
                     ConfigurationEntry.SecretKey,
-                    RegionEndpoint.GetBySystemName(ConfigurationEntry.Region));
+                    config);
             }
         }
 

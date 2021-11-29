@@ -5,6 +5,7 @@
     "RedriveUrl": "http://nohost.com/",
     "Region": "eu-west-1",
     "Active": true,
-    "Timeout": 10000
+    "Timeout": 10000,
+    "ServiceUrl":  "https://www.google.com" 
   }
 ]
