@@ -15,8 +15,22 @@ namespace AWSRedrive
         {
             Logger.Trace($"Preparing post to {configurationEntry.RedriveUrl}");
             var uri = new Uri(configurationEntry.RedriveUrl);
-            var client = new RestClient($"{uri.Scheme}://{uri.Host}:{uri.Port}");
-            var post = new RestRequest(uri.PathAndQuery, configurationEntry.UsePUT ? Method.PUT : Method.POST);
+
+            var options = new RestClientOptions($"{uri.Scheme}://{uri.Host}:{uri.Port}");
+
+            if (configurationEntry.IgnoreCertificateErrors)
+            {
+                options.RemoteCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
+            }
+
+            if (configurationEntry.Timeout.HasValue)
+            {
+                options.Timeout = configurationEntry.Timeout.Value;
+            }
+
+            var client = new RestClient(options);
+
+            var post = new RestRequest(uri.PathAndQuery, configurationEntry.UsePUT ? Method.Put : Method.Post);
             post.AddParameter("application/json", message, ParameterType.RequestBody);
 
             if (!string.IsNullOrEmpty(configurationEntry.AwsGatewayToken))
@@ -36,18 +50,8 @@ namespace AWSRedrive
                     configurationEntry.BasicAuthPassword);
             }
 
-            if (configurationEntry.IgnoreCertificateErrors)
-            {
-                client.RemoteCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
-            }
-
-            if (configurationEntry.Timeout.HasValue)
-            {
-                client.Timeout = configurationEntry.Timeout.Value;
-            }
-
             Logger.Trace($"Posting to {configurationEntry.RedriveUrl}");
-            var response = client.Execute(post);
+            var response = client.ExecuteAsync(post).Result;
 
             if (response.IsSuccessful && 
                 (response.StatusCode == HttpStatusCode.OK || response.StatusCode == HttpStatusCode.Created)) 
