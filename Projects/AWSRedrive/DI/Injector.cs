@@ -6,18 +6,23 @@ namespace AWSRedrive.DI
 {
     public class Injector
     {
-        private static ServiceProvider Container { get; }
+        public static ServiceProvider Container { get; set; }
 
-        static Injector()
+        public static void Inject()
         {
             var services = new ServiceCollection();
+            Inject(services);
+            Container = services.BuildServiceProvider();
+        }
+
+        public static void Inject(IServiceCollection services)
+        {
             services.AddSingleton<IConfigurationReader, ConfigurationReader>();
             services.AddSingleton<IQueueClientFactory, QueueClientFactory>();
             services.AddSingleton<IMessageProcessorFactory, MessageProcessorFactory>();
             services.AddTransient<IQueueProcessorFactory, QueueProcessorFactory>();
             services.AddTransient<IConfigurationChangeManager, ConfigurationChangeManager>();
             services.AddTransient<IOrchestrator, Orchestrator>();
-            Container = services.BuildServiceProvider();
         }
 
         protected Injector() { }
