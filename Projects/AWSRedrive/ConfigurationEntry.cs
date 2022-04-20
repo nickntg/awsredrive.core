@@ -9,6 +9,10 @@
         public string Region { get; set; }
         public string RedriveUrl { get; set; }
         public string RedriveScript { get; set; }
+        public string RedriveKafkaTopic { get; set; }
+        public string KafkaBootstrapServers { get; set; }
+        public string KafkaClientId { get; set; }
+        public bool UseKafkaCompression { get; set; }
         public string AwsGatewayToken { get; set; }
         public string AuthToken { get; set; }
         public string BasicAuthUserName { get; set; }

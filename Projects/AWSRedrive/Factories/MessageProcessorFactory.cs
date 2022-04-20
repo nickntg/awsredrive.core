@@ -7,8 +7,10 @@ namespace AWSRedrive.Factories
         public IMessageProcessor CreateMessageProcessor(ConfigurationEntry configuration)
         {
             return string.IsNullOrEmpty(configuration.RedriveUrl)
-                ? (IMessageProcessor) new PowerShellMessageProcessor()
-                : (IMessageProcessor) new HttpMessageProcessor();
+                ? string.IsNullOrEmpty(configuration.RedriveScript)
+                    ? new KafkaMessageProcessor()
+                    : new PowerShellMessageProcessor()
+                : new HttpMessageProcessor();
         }
     }
 }
