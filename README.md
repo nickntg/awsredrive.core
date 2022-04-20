@@ -7,3 +7,35 @@ Why not subscribe the HTTP backend service directly to the SNS topic? Well, that
 ![What AWSRedrive does](https://github.com/nickntg/awsredrive.core/blob/master/schematic.png)
 
 Configuration is stored in config.json and is periodically read by AWSRedrive, therefore changes take effect without requiring a restart. AWSRedrive can currently post to simple HTTP(S) endpoints and to AWS Gateway endpoints that are using an authentication token.
+
+Here's a sample configuration entry for reading a queue and posting the messages found there to an endpoint:
+
+```js
+  {
+    "Alias": "#1",
+    "QueueUrl": "https://sqs.eu-west-1.amazonaws.com/accountid/inputqueue1",
+    "RedriveUrl": "http://nohost.com/",
+    "Region": "eu-west-1",
+    "Active": true,
+    "Timeout": 10000,
+    "ServiceUrl":  "https://www.google.com" 
+  }
+```
+
+Here are the elements of a configuration entry:
+* **Alias**. This is a unique name for each configuration entry.
+* **AccessKey**. The AWS access key to use when accessing SQS. If an access key is not found, AWSRedrive will not use one and rely on the AWS SDK to determine how to connect to SQS.
+* **SecretKey**. The AWS secret key to use when accessing SQS.
+* **QueueUrl**. The URL of the SQS queue to read.
+* **Region**. The region of the SQS queue.
+* **RedriveUrl**. The endpoint of the service to post SQS messages to.
+* **RedriveScript**. The powershell script to execute with content of SQS messages. This parameter comes into effect if RedriveUrl is empty.
+* **AwsGatewayToken**. If present, AWSRedrive will add this value to an _x-api-key_ header before posting SQS messages to the configured service endpoint. Useful when the service is exposed via AWS Gateway and a token is required.
+* **AuthToken**. If present, AWSRedrive will add this value to the authorization header before posting SQS messages to the configured service endpoint.
+* **BasicAuthUserName**. If present, AWSRedrive will use this value and the one specified in BasicAuthPassword to perform basic authentication when posting messages to the configured service endpoint.
+* **BasicAuthPassword**. See above.
+* **Active**. Set to True to enable the configuration, False to disable it.
+* **UsePUT**. If set to True, AWSRedrive will use PUT instead of POST when sending messages to the configured service endpoint.
+* **Timeout**. Service timeout in milliseconds to observe when sending messages to the configured service endpoint.
+* **IgnoreCertificateErrors**. If set to True, AWSRedrive will ignore any certificate errors when connecting to the configured service endpoint.
+* **ServiceUrl**. If configured, this value will be passed to the ServiceURL property of the AWS SDK. This is useful when working with [LocalStack](https://localstack.cloud/) instead of AWS.
