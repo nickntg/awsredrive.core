@@ -7,6 +7,7 @@ namespace AWSRedrive.console
     {
         static void Main()
         {
+            Injector.Inject();
             var orchestrator = Injector.GetOrchestrator();
             orchestrator.Start();
             Console.ReadLine();
