@@ -30,6 +30,10 @@ Here are the elements of a configuration entry:
 * **Region**. The region of the SQS queue.
 * **RedriveUrl**. The endpoint of the service to post SQS messages to.
 * **RedriveScript**. The powershell script to execute with content of SQS messages. This parameter comes into effect if RedriveUrl is empty.
+* **RedriveKafkaTopic**. The Kafka topic to send content of SQS messages to. This parameter comes into effect if RedriveUrl and RedriveScript are both empty.
+* **KafkaBootstrapServers**. The bootstrap servers to use when connecting to Kafka as a producer.
+* **KafkaClientId**. The client id to use when connecting to Kafka. If not specified, a value of _redrive_ is used.
+* **UseKafkaCompression**. If set to True, Snappy compression is enabled when sending messages to the Kafka topic.
 * **AwsGatewayToken**. If present, AWSRedrive will add this value to an _x-api-key_ header before posting SQS messages to the configured service endpoint. Useful when the service is exposed via AWS Gateway and a token is required.
 * **AuthToken**. If present, AWSRedrive will add this value to the authorization header before posting SQS messages to the configured service endpoint.
 * **BasicAuthUserName**. If present, AWSRedrive will use this value and the one specified in BasicAuthPassword to perform basic authentication when posting messages to the configured service endpoint.
