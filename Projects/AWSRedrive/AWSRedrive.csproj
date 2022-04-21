@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="AWSSDK.SQS" Version="3.7.2.46" />
+    <PackageReference Include="Confluent.Kafka" Version="1.8.2" />
     <PackageReference Include="FluentValidation" Version="10.4.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
     <PackageReference Include="Microsoft.PowerShell.Commands.Diagnostics" Version="7.2.2" />
