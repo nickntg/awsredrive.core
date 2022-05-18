@@ -31,7 +31,8 @@ namespace AWSRedrive
             var client = new RestClient(options);
 
             var post = new RestRequest(uri.PathAndQuery, configurationEntry.UsePUT ? Method.Put : Method.Post);
-            post.AddParameter("application/json", message, ParameterType.RequestBody);
+
+            post.AddStringBody(message, DataFormat.Json);
 
             if (!string.IsNullOrEmpty(configurationEntry.AwsGatewayToken))
             {
