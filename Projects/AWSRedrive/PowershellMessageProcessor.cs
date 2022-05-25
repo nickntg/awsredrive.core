@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Collections.Generic;
+using System.IO;
 using System.Management.Automation;
 using System.Text;
 using AWSRedrive.Interfaces;
@@ -10,7 +11,7 @@ namespace AWSRedrive
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public void ProcessMessage(string message, ConfigurationEntry configurationEntry)
+        public void ProcessMessage(string message, Dictionary<string, string> attributes, ConfigurationEntry configurationEntry)
         {
             using (var ps = PowerShell.Create())
             {

@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using AWSRedrive.Interfaces;
 using NLog;
@@ -11,7 +13,7 @@ namespace AWSRedrive
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public void ProcessMessage(string message, ConfigurationEntry configurationEntry)
+        public void ProcessMessage(string message, Dictionary<string, string> attributes, ConfigurationEntry configurationEntry)
         {
             Logger.Trace($"Preparing post to {configurationEntry.RedriveUrl}");
             var uri = new Uri(configurationEntry.RedriveUrl);
@@ -42,6 +44,14 @@ namespace AWSRedrive
             if (!string.IsNullOrEmpty(configurationEntry.AuthToken))
             {
                 post.AddHeader("Authorization", configurationEntry.AuthToken);
+            }
+
+            if (attributes != null)
+            {
+                foreach (var key in attributes.Keys.Where(key => !string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(attributes[key])))
+                {
+                    post.AddHeader(key, attributes[key]);
+                }
             }
 
             if (!string.IsNullOrEmpty(configurationEntry.BasicAuthPassword) &&

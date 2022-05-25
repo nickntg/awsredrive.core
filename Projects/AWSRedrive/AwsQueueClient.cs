@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Amazon;
@@ -52,7 +54,8 @@ namespace AWSRedrive
             {
                 MaxNumberOfMessages = 1,
                 QueueUrl = ConfigurationEntry.QueueUrl,
-                WaitTimeSeconds = 20
+                WaitTimeSeconds = 20,
+                MessageAttributeNames = new List<string> {"*"}
             };
 
             using (var source = new CancellationTokenSource(20 * 1000))
@@ -63,7 +66,9 @@ namespace AWSRedrive
                     if (response?.Messages?.Count >= 1)
                     {
                         return new SqsMessage(response.Messages[0].ReceiptHandle,
-                            response.Messages[0].Body);
+                            response.Messages[0].Body,
+                            (response.Messages[0].MessageAttributes)
+                                .ToDictionary(item => item.Key, item => item.Value.StringValue));
                     }
 
                     return null;

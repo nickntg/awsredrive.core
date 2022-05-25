@@ -102,7 +102,7 @@ namespace AWSRedrive
                     Logger.Debug($"Processing message, queue processor [{Configuration.Alias}], url {Configuration.RedriveUrl}");
                     var messageProcessor = _messageProcessorFactory.CreateMessageProcessor(Configuration);
                     Logger.Debug($"Using {messageProcessor.GetType()} processor");
-                    messageProcessor.ProcessMessage(msg.Content, Configuration);
+                    messageProcessor.ProcessMessage(msg.Content, msg.Attributes, Configuration);
                     Logger.Debug($"Processing complete, queue processor [{Configuration.Alias}]");
 
                     _messagesSent++;

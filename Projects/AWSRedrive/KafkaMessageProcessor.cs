@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using AWSRedrive.Interfaces;
 using Confluent.Kafka;
@@ -10,7 +11,7 @@ namespace AWSRedrive
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public void ProcessMessage(string message, ConfigurationEntry configurationEntry)
+        public void ProcessMessage(string message, Dictionary<string, string> attributes, ConfigurationEntry configurationEntry)
         {
             var config = new ProducerConfig
             {
