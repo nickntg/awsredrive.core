@@ -6,6 +6,7 @@
     "Region": "eu-west-1",
     "Active": true,
     "Timeout": 10000,
+    "UseGET": true, 
     "ServiceUrl":  "https://www.google.com" 
   }
 ]
