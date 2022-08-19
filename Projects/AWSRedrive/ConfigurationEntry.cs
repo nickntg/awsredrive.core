@@ -19,6 +19,7 @@
         public string BasicAuthPassword { get; set; }
         public bool Active { get; set; }
         public bool UsePUT { get; set; }
+        public bool UseGET { get; set; }
         public int? Timeout { get; set; }
         public bool IgnoreCertificateErrors { get; set; }
         public string ServiceUrl { get; set; }
