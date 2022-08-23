@@ -39,6 +39,7 @@ Here are the elements of a configuration entry:
 * **BasicAuthUserName**. If present, AWSRedrive will use this value and the one specified in BasicAuthPassword to perform basic authentication when posting messages to the configured service endpoint.
 * **BasicAuthPassword**. See above.
 * **Active**. Set to True to enable the configuration, False to disable it.
+* **UseDELETE**. If set to True, AWSRedrive will use DELETE instead of POST when sending messages to the configured service endpoint. Any JSON body will be included.
 * **UseGET**. If set to True, AWSRedrive will use GET when sending messages to the configured service endpoint. When doing that, AWSRedrive will unwrap any JSON object contained in the SQS message and turn all JSON fields to query parameters.
 * **UsePUT**. If set to True, AWSRedrive will use PUT instead of POST when sending messages to the configured service endpoint.
 * **Timeout**. Service timeout in milliseconds to observe when sending messages to the configured service endpoint.
