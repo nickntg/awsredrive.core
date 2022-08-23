@@ -35,7 +35,7 @@ namespace AWSRedrive
         private RestRequest CreateRequest(string message, Uri uri, ConfigurationEntry configurationEntry)
         {
             return !configurationEntry.UseGET 
-                ? CreatePostOrPutRequest(message, uri, configurationEntry) 
+                ? CreatePostOrPutOrDeleteRequest(message, uri, configurationEntry) 
                 : CreateGetRequest(message, uri);
         }
 
@@ -59,9 +59,9 @@ namespace AWSRedrive
             return request;
         }
 
-        private RestRequest CreatePostOrPutRequest(string message, Uri uri, ConfigurationEntry configurationEntry)
+        private RestRequest CreatePostOrPutOrDeleteRequest(string message, Uri uri, ConfigurationEntry configurationEntry)
         {
-            var request = new RestRequest(uri.PathAndQuery, configurationEntry.UsePUT ? Method.Put : Method.Post);
+            var request = new RestRequest(uri.PathAndQuery, configurationEntry.UseDelete ? Method.Delete : configurationEntry.UsePUT ? Method.Put : Method.Post);
 
             request.AddStringBody(message, DataFormat.Json);
 
