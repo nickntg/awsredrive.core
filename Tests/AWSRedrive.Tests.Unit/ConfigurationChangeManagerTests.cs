@@ -205,7 +205,7 @@ namespace AWSRedrive.Tests.Unit
 
             foreach (var processor in mockedProcessors)
             {
-                processor.VerifyGet(x => x.Configuration, Times.Exactly(18));
+                processor.VerifyGet(x => x.Configuration, Times.Exactly(4));
             }
         }
 
