@@ -7,16 +7,16 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="AWSSDK.SQS" Version="3.7.2.46" />
-    <PackageReference Include="Confluent.Kafka" Version="1.8.2" />
-    <PackageReference Include="FluentValidation" Version="10.4.0" />
+    <PackageReference Include="AWSSDK.SQS" Version="3.7.2.92" />
+    <PackageReference Include="Confluent.Kafka" Version="1.9.2" />
+    <PackageReference Include="FluentValidation" Version="11.2.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
-    <PackageReference Include="Microsoft.PowerShell.Commands.Diagnostics" Version="7.2.2" />
-    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.2.2" />
-    <PackageReference Include="Microsoft.WSMan.Management" Version="7.2.2" />
+    <PackageReference Include="Microsoft.PowerShell.Commands.Diagnostics" Version="7.2.6" />
+    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.2.6" />
+    <PackageReference Include="Microsoft.WSMan.Management" Version="7.2.6" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
-    <PackageReference Include="NLog" Version="4.7.15" />
-    <PackageReference Include="RestSharp" Version="107.3.0" />
+    <PackageReference Include="NLog" Version="5.0.2" />
+    <PackageReference Include="RestSharp" Version="108.0.1" />
   </ItemGroup>
 
   <ItemGroup>

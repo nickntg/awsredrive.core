@@ -79,7 +79,7 @@ namespace AWSRedrive
 
             if (configurationEntry.Timeout.HasValue)
             {
-                options.Timeout = configurationEntry.Timeout.Value;
+                options.MaxTimeout = configurationEntry.Timeout.Value;
             }
 
             return options;
