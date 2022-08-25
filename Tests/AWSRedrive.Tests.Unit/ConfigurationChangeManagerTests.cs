@@ -115,51 +115,19 @@ namespace AWSRedrive.Tests.Unit
         [Fact]
         public void StartsOneAndStopsOneProcessor()
         {
-            var configChangeManager = new ConfigurationChangeManager();
-            var config = new SimpleConfigurationReader
-            {
-                Configs = new List<ConfigurationEntry> { GetOneConfigurationEntry("#1", true) }
-            };
-
-            var mockNewProcessor = new Mock<IQueueProcessor>(MockBehavior.Strict);
-            mockNewProcessor.SetupGet(x => x.Configuration).Returns(GetOneConfigurationEntry("#1", true));
-            mockNewProcessor.Setup(x => x.Start()).Verifiable();
-            mockNewProcessor.Setup(x =>x.Init(It.IsAny<IQueueClient>(), It.IsAny<IMessageProcessorFactory>(), It.IsAny<ConfigurationEntry>())).Verifiable();
-
-            var mockProcessorFactory = new Mock<IQueueProcessorFactory>(MockBehavior.Strict);
-            mockProcessorFactory.Setup(x => x.CreateQueueProcessor()).Returns(mockNewProcessor.Object).Verifiable();
-
-            var mockClient = new Mock<IQueueClient>(MockBehavior.Strict);
-            mockClient.Setup(x => x.Init()).Verifiable();
-            
-            var mockClientFactory = new Mock<IQueueClientFactory>(MockBehavior.Strict);
-            mockClientFactory.Setup(x => x.CreateClient(It.IsAny<ConfigurationEntry>())).Returns(mockClient.Object).Verifiable();
-
-            var mockMessageProcessorFactory = new Mock<IMessageProcessorFactory>(MockBehavior.Strict);
-
-            var mockExistingProcessor = new Mock<IQueueProcessor>(MockBehavior.Strict);
-            mockExistingProcessor.Setup(x => x.Configuration).Returns(GetOneConfigurationEntry("#2", true)).Verifiable();
-            mockExistingProcessor.Setup(x => x.Stop()).Verifiable();
-            var processors = new List<IQueueProcessor>
-            {
-                mockExistingProcessor.Object
-            };
-            configChangeManager.ReadChanges(config, processors, mockClientFactory.Object, mockMessageProcessorFactory.Object, mockProcessorFactory.Object);
-            Assert.NotNull(processors);
-            Assert.Single(processors);
-
-            mockClient.Verify(x => x.Init(), Times.Exactly(1));
-            mockClientFactory.Verify(x => x.CreateClient(It.IsAny<ConfigurationEntry>()), Times.Exactly(1));
-            //mockMessageProcessorFactory.Verify(x => x.CreateMessageProcessor(It.IsAny<ConfigurationEntry>()), Times.Exactly(1));
-            mockProcessorFactory.Verify(x => x.CreateQueueProcessor(), Times.Exactly(1));
-            mockNewProcessor.Verify(x => x.Start(), Times.Exactly(1));
-            mockNewProcessor.Verify(x => x.Init(It.IsAny<IQueueClient>(), It.IsAny<IMessageProcessorFactory>(), It.IsAny<ConfigurationEntry>()), Times.Exactly(1));
-            mockExistingProcessor.VerifyGet(x => x.Configuration, Times.AtLeastOnce());
-            mockExistingProcessor.Verify(x => x.Stop(), Times.Exactly(1));
+            StartAndStopOneProcessor(GetOneConfigurationEntry("#2", true));
         }
 
         [Fact]
         public void StartsOneAndStopsOneProcessorThatWasChanged()
+        {
+            var existingProcessor = GetOneConfigurationEntry("#1", true);
+            existingProcessor.BasicAuthPassword = "1234";
+
+            StartAndStopOneProcessor(existingProcessor);
+        }
+
+        private void StartAndStopOneProcessor(ConfigurationEntry entryToUse)
         {
             var configChangeManager = new ConfigurationChangeManager();
             var config = new SimpleConfigurationReader
@@ -184,9 +152,7 @@ namespace AWSRedrive.Tests.Unit
             var mockMessageProcessorFactory = new Mock<IMessageProcessorFactory>(MockBehavior.Strict);
 
             var mockExistingProcessor = new Mock<IQueueProcessor>(MockBehavior.Strict);
-            var existingProcessor = GetOneConfigurationEntry("#1", true);
-            existingProcessor.BasicAuthPassword = "1234";
-            mockExistingProcessor.Setup(x => x.Configuration).Returns(existingProcessor).Verifiable();
+            mockExistingProcessor.Setup(x => x.Configuration).Returns(entryToUse).Verifiable();
             mockExistingProcessor.Setup(x => x.Stop()).Verifiable();
             var processors = new List<IQueueProcessor>
             {
