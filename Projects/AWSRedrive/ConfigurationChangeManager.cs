@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using AWSRedrive.Interfaces;
+using Newtonsoft.Json;
 using NLog;
 
 namespace AWSRedrive
@@ -49,11 +50,11 @@ namespace AWSRedrive
             }
         }
 
-        private List<IQueueProcessor> FindConfigsToAdd(List<ConfigurationEntry> configurations,
-    List<IQueueProcessor> processors,
-    IQueueClientFactory queueClientFactory,
-    IMessageProcessorFactory messageProcessorFactory,
-    IQueueProcessorFactory queueProcessorFactory)
+        private List<IQueueProcessor> FindConfigsToAdd(List<ConfigurationEntry> configurations, 
+            List<IQueueProcessor> processors,
+            IQueueClientFactory queueClientFactory,
+            IMessageProcessorFactory messageProcessorFactory,
+            IQueueProcessorFactory queueProcessorFactory)
         {
             var toAdd = new List<IQueueProcessor>();
             foreach (var config in configurations)
@@ -63,17 +64,12 @@ namespace AWSRedrive
                     continue;
                 }
 
+                var processorConfig = JsonConvert.SerializeObject(config);
                 var found = false;
                 foreach (var processor in processors)
                 {
-                    found = ((config.Alias == processor.Configuration.Alias) &&
-                             (config.AccessKey == processor.Configuration.AccessKey) &&
-                             (config.AwsGatewayToken == processor.Configuration.AwsGatewayToken) &&
-                             (config.AuthToken == processor.Configuration.AuthToken) &&
-                             (config.QueueUrl == processor.Configuration.QueueUrl) &&
-                             (config.RedriveUrl == processor.Configuration.RedriveUrl) &&
-                             (config.Region == processor.Configuration.Region) &&
-                             (config.SecretKey == processor.Configuration.SecretKey));
+                    found = JsonConvert.SerializeObject(processor.Configuration) == processorConfig;
+
                     if (found)
                     {
                         break;
@@ -100,18 +96,11 @@ namespace AWSRedrive
             var toRemove = new List<IQueueProcessor>();
             foreach (var processor in processors)
             {
+                var processorConfig = JsonConvert.SerializeObject(processor.Configuration);
                 var found = false;
                 foreach (var config in configurations)
                 {
-                    found = ((config.Alias == processor.Configuration.Alias) &&
-                             (config.AccessKey == processor.Configuration.AccessKey) &&
-                             (config.AwsGatewayToken == processor.Configuration.AwsGatewayToken) &&
-                             (config.AuthToken == processor.Configuration.AuthToken) &&
-                             (config.QueueUrl == processor.Configuration.QueueUrl) &&
-                             (config.RedriveUrl == processor.Configuration.RedriveUrl) &&
-                             (config.Region == processor.Configuration.Region) &&
-                             (config.SecretKey == processor.Configuration.SecretKey) &&
-                             (config.Active));
+                    found = JsonConvert.SerializeObject(config) == processorConfig;
                     if (found)
                     {
                         break;
