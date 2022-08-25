@@ -203,9 +203,11 @@ namespace AWSRedrive.Tests.Unit
             Assert.NotNull(processors);
             Assert.Equal(3, processors.Count);
 
+            var count = 4;
             foreach (var processor in mockedProcessors)
             {
-                processor.VerifyGet(x => x.Configuration, Times.Exactly(4));
+                processor.VerifyGet(x => x.Configuration, Times.Exactly(count));
+                count--;
             }
         }
 
