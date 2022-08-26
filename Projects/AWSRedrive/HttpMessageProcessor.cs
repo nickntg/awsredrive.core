@@ -32,16 +32,16 @@ namespace AWSRedrive
             SendRequest(client, request, configurationEntry);
         }
 
-        private RestRequest CreateRequest(string message, Uri uri, ConfigurationEntry configurationEntry)
+        public RestRequest CreateRequest(string message, Uri uri, ConfigurationEntry configurationEntry)
         {
             return !configurationEntry.UseGET 
                 ? CreatePostOrPutOrDeleteRequest(message, uri, configurationEntry) 
                 : CreateGetRequest(message, uri);
         }
 
-        private RestRequest CreateGetRequest(string message, Uri uri)
+        public RestRequest CreateGetRequest(string message, Uri uri)
         {
-            var request = new RestRequest(uri.PathAndQuery, Method.Get);
+            var request = new RestRequest(uri.PathAndQuery);
             try
             {
                 var data = JObject.Parse(message);
@@ -59,7 +59,7 @@ namespace AWSRedrive
             return request;
         }
 
-        private RestRequest CreatePostOrPutOrDeleteRequest(string message, Uri uri, ConfigurationEntry configurationEntry)
+        public RestRequest CreatePostOrPutOrDeleteRequest(string message, Uri uri, ConfigurationEntry configurationEntry)
         {
             var request = new RestRequest(uri.PathAndQuery, configurationEntry.UseDelete ? Method.Delete : configurationEntry.UsePUT ? Method.Put : Method.Post);
 
@@ -68,13 +68,13 @@ namespace AWSRedrive
             return request;
         }
 
-        private RestClientOptions CreateOptions(Uri uri, ConfigurationEntry configurationEntry)
+        public RestClientOptions CreateOptions(Uri uri, ConfigurationEntry configurationEntry)
         {
             var options = new RestClientOptions($"{uri.Scheme}://{uri.Host}:{uri.Port}");
 
             if (configurationEntry.IgnoreCertificateErrors)
             {
-                options.RemoteCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
+                options.RemoteCertificateValidationCallback = (_, _, _, _) => true;
             }
 
             if (configurationEntry.Timeout.HasValue)
@@ -85,7 +85,7 @@ namespace AWSRedrive
             return options;
         }
 
-        private void AddAuthentication(RestClient client, RestRequest request, ConfigurationEntry configurationEntry)
+        public void AddAuthentication(RestClient client, RestRequest request, ConfigurationEntry configurationEntry)
         {
             if (!string.IsNullOrEmpty(configurationEntry.AwsGatewayToken))
             {
@@ -105,7 +105,7 @@ namespace AWSRedrive
             }
         }
 
-        private void AddAttributes(RestRequest request, Dictionary<string, string> attributes)
+        public void AddAttributes(RestRequest request, Dictionary<string, string> attributes)
         {
             if (attributes != null)
             {
