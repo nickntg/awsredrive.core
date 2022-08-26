@@ -20,5 +20,13 @@ namespace AWSRedrive.Tests.Unit
             var o = factory.CreateMessageProcessor(new ConfigurationEntry { RedriveScript = "some string" });
             Assert.IsType<PowerShellMessageProcessor>(o);
         }
+
+        [Fact]
+        public void CreatesAKafkaProcessor()
+        {
+            var factory = new MessageProcessorFactory();
+            var o = factory.CreateMessageProcessor(new ConfigurationEntry { RedriveKafkaTopic = "some string" });
+            Assert.IsType<KafkaMessageProcessor>(o);
+        }
     }
 }
