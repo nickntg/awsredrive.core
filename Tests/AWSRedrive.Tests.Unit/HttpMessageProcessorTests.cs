@@ -17,10 +17,12 @@ namespace AWSRedrive.Tests.Unit
 
             Assert.Equal("/v", request.Resource);
             Assert.Equal(2, request.Parameters.Count);
-            Assert.NotNull(request.Parameters.TryFind("a"));
-            Assert.Equal("b", request.Parameters.TryFind("a").Value);
-            Assert.NotNull(request.Parameters.TryFind("c"));
-            Assert.Equal("d", request.Parameters.TryFind("c").Value);
+            var parameter = request.Parameters.TryFind("a");
+            Assert.NotNull(parameter);
+            Assert.Equal("b", parameter.Value);
+            parameter = request.Parameters.TryFind("c");
+            Assert.NotNull(parameter);
+            Assert.Equal("d", parameter.Value);
         }
 
         [Fact]
@@ -33,9 +35,10 @@ namespace AWSRedrive.Tests.Unit
 
             Assert.Equal("/v", request.Resource);
             Assert.Single(request.Parameters);
-            Assert.NotNull(request.Parameters.TryFind(""));
-            Assert.Equal("{}", request.Parameters.TryFind("").Value);
-            Assert.Equal(ParameterType.RequestBody, request.Parameters.TryFind("").Type);
+            var parameter = request.Parameters.TryFind("");
+            Assert.NotNull(parameter);
+            Assert.Equal("{}", parameter.Value);
+            Assert.Equal(ParameterType.RequestBody, parameter.Type);
         }
 
         [Theory]
@@ -134,34 +137,34 @@ namespace AWSRedrive.Tests.Unit
             processor.AddAuthentication(null, request, entry);
 
             Assert.Single(request.Parameters);
-            Assert.NotNull(request.Parameters.TryFind(header));
-            Assert.Equal(value, request.Parameters.TryFind(header).Value);
-            Assert.Equal(ParameterType.HttpHeader, request.Parameters.TryFind(header).Type);
+            var parameter = request.Parameters.TryFind(header);
+            Assert.NotNull(parameter);
+            Assert.Equal(value, parameter.Value);
+            Assert.Equal(ParameterType.HttpHeader, parameter.Type);
         }
 
         [Theory]
         [InlineData(true)]
         [InlineData(false)]
-        public void VerifyAuthenticatorSet(bool useBasicAuth)
+        public void VerifyAuthentication(bool useBasicAuth)
         {
             var processor = new HttpMessageProcessor();
 
             var client = new RestClient();
-            processor.AddAuthentication(client, null,
-                new ConfigurationEntry
-                {
-                    BasicAuthPassword = useBasicAuth ? "abc" : string.Empty,
-                    BasicAuthUserName = useBasicAuth ? "1234" : string.Empty
-                });
+            var options = processor.CreateOptions(new Uri("http://localhost"), new ConfigurationEntry
+            {
+                BasicAuthPassword = useBasicAuth ? "abc" : string.Empty,
+                BasicAuthUserName = useBasicAuth ? "1234" : string.Empty
+            });
 
             if (useBasicAuth)
             {
-                Assert.NotNull(client.Authenticator);
-                Assert.IsType<HttpBasicAuthenticator>(client.Authenticator);
+                Assert.NotNull(options.Authenticator);
+                Assert.IsType<HttpBasicAuthenticator>(options.Authenticator);
             }
             else
             {
-                Assert.Null(client.Authenticator);
+                Assert.Null(options.Authenticator);
             }
         }
 
@@ -182,10 +185,12 @@ namespace AWSRedrive.Tests.Unit
             processor.AddAttributes(request, new Dictionary<string, string> { { "a", "b" }, { "c", "d" } });
 
             Assert.Equal(2, request.Parameters.Count);
-            Assert.NotNull(request.Parameters.TryFind("a"));
-            Assert.Equal("b", request.Parameters.TryFind("a").Value);
-            Assert.NotNull(request.Parameters.TryFind("c"));
-            Assert.Equal("d", request.Parameters.TryFind("c").Value);
+            var parameter = request.Parameters.TryFind("a");
+            Assert.NotNull(parameter);
+            Assert.Equal("b", parameter.Value);
+            parameter = request.Parameters.TryFind("c");
+            Assert.NotNull(parameter);
+            Assert.Equal("d", parameter.Value);
         }
     }
 }

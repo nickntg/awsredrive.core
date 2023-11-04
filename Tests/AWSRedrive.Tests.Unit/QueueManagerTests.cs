@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Threading;
 using AWSRedrive.Interfaces;
-using Moq;
+using FakeItEasy;
 using Xunit;
 
 namespace AWSRedrive.Tests.Unit
@@ -11,41 +11,63 @@ namespace AWSRedrive.Tests.Unit
         [Fact]
         public void DoesNothingWithoutQueuedMessage()
         {
-            var configuration = new ConfigurationEntry {Alias = "#1", RedriveUrl = "http://here.com/", Active = true};
-            var queueClientMock = new Mock<IQueueClient>(MockBehavior.Strict);
-            queueClientMock.Setup(x => x.GetMessage()).Callback(() => Thread.Sleep(2000)).Returns((SqsMessage) null).Verifiable();
+            var configuration = new ConfigurationEntry { Alias = "#1", RedriveUrl = "http://here.com/", Active = true };
+            var queueClientMock = A.Fake<IQueueClient>(x => x.Strict());
+            A.CallTo(() => queueClientMock.GetMessage())
+                .Invokes(() =>
+                {
+                    Thread.Sleep(2000);
+                })
+                .Returns(null);
 
             var processor = new QueueProcessor();
-            processor.Init(queueClientMock.Object, null, configuration);
+            processor.Init(queueClientMock, null, configuration);
             processor.Start();
             Thread.Sleep(1000);
             processor.Stop();
 
-            queueClientMock.Verify(x => x.GetMessage(), Times.Exactly(1));
+            A.CallTo(() => queueClientMock.GetMessage())
+                .MustHaveHappenedOnceExactly();
         }
 
         [Fact]
         public void ReceivesAndSendsMessage()
         {
             var configuration = new ConfigurationEntry { Alias = "#1", RedriveUrl = "http://here.com/", Active = true };
-            var queueClientMock = new Mock<IQueueClient>(MockBehavior.Strict);
-            queueClientMock.Setup(x => x.GetMessage()).Returns(new SqsMessage("id", "content", new Dictionary<string, string>())).Verifiable();
-            var messageProcessorMock = new Mock<IMessageProcessor>(MockBehavior.Strict);
-            messageProcessorMock.Setup(x => x.ProcessMessage(It.IsAny<string>(), It.IsAny<Dictionary<string, string>>(), It.IsAny<ConfigurationEntry>())).Verifiable();
-            queueClientMock.Setup(x => x.DeleteMessage(It.IsAny<IMessage>())).Callback(() => Thread.Sleep(2000));
-            var processorFactoryMock = new Mock<IMessageProcessorFactory>(MockBehavior.Strict);
-            processorFactoryMock.Setup(x => x.CreateMessageProcessor(It.IsAny<ConfigurationEntry>())).Returns(messageProcessorMock.Object).Verifiable();
+            var queueClientMock = A.Fake<IQueueClient>(x => x.Strict());
+            A.CallTo(() => queueClientMock.GetMessage())
+                .Returns(new SqsMessage("id", "content", new Dictionary<string, string>()));
+            A.CallTo(() => queueClientMock.DeleteMessage(A<IMessage>.Ignored))
+                .Invokes((IMessage _) =>
+                {
+                    Thread.Sleep(2000);
+                })
+                .DoesNothing();
+
+            var messageProcessorMock = A.Fake<IMessageProcessor>(x => x.Strict());
+            A.CallTo(() => messageProcessorMock.ProcessMessage(A<string>.Ignored, A<Dictionary<string, string>>.Ignored,
+                    A<ConfigurationEntry>.Ignored))
+                .DoesNothing();
+            
+            var processorFactoryMock = A.Fake<IMessageProcessorFactory>(x => x.Strict());
+            A.CallTo(() => processorFactoryMock.CreateMessageProcessor(A<ConfigurationEntry>.Ignored))
+                .Returns(messageProcessorMock);
 
             var processor = new QueueProcessor();
-            processor.Init(queueClientMock.Object, processorFactoryMock.Object, configuration);
+            processor.Init(queueClientMock, processorFactoryMock, configuration);
             processor.Start();
             Thread.Sleep(1000);
             processor.Stop();
 
-            queueClientMock.Verify(x => x.GetMessage(), Times.Exactly(1));
-            messageProcessorMock.Verify(x => x.ProcessMessage(It.IsAny<string>(), It.IsAny<Dictionary<string, string>>(), It.IsAny<ConfigurationEntry>()),Times.Exactly(1));
-            queueClientMock.Verify(x => x.DeleteMessage(It.IsAny<IMessage>()), Times.Exactly(1));
-            processorFactoryMock.Verify(x => x.CreateMessageProcessor(It.IsAny<ConfigurationEntry>()), Times.Exactly(1));
+            A.CallTo(() => queueClientMock.GetMessage())
+                .MustHaveHappenedOnceExactly();
+            A.CallTo(() => queueClientMock.DeleteMessage(A<IMessage>.Ignored))
+                .MustHaveHappenedOnceExactly();
+            A.CallTo(() => messageProcessorMock.ProcessMessage(A<string>.Ignored, A<Dictionary<string, string>>.Ignored,
+                A<ConfigurationEntry>.Ignored))
+                .MustHaveHappenedOnceExactly();
+            A.CallTo(() => processorFactoryMock.CreateMessageProcessor(A<ConfigurationEntry>.Ignored))
+                .MustHaveHappenedOnceExactly();
         }
     }
 }

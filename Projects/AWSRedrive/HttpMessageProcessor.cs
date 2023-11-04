@@ -82,6 +82,13 @@ namespace AWSRedrive
                 options.MaxTimeout = configurationEntry.Timeout.Value;
             }
 
+            if (!string.IsNullOrEmpty(configurationEntry.BasicAuthPassword) &&
+                !string.IsNullOrEmpty(configurationEntry.BasicAuthUserName))
+            {
+                options.Authenticator = new HttpBasicAuthenticator(configurationEntry.BasicAuthUserName,
+                    configurationEntry.BasicAuthPassword);
+            }
+
             return options;
         }
 
@@ -95,13 +102,6 @@ namespace AWSRedrive
             if (!string.IsNullOrEmpty(configurationEntry.AuthToken))
             {
                 request.AddHeader("Authorization", configurationEntry.AuthToken);
-            }
-
-            if (!string.IsNullOrEmpty(configurationEntry.BasicAuthPassword) &&
-                !string.IsNullOrEmpty(configurationEntry.BasicAuthUserName))
-            {
-                client.Authenticator = new HttpBasicAuthenticator(configurationEntry.BasicAuthUserName,
-                    configurationEntry.BasicAuthPassword);
             }
         }
 

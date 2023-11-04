@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using AWSRedrive.Interfaces;
 using AWSRedrive.Tests.Unit.Helpers;
-using Moq;
+using FakeItEasy;
 using Xunit;
 
 namespace AWSRedrive.Tests.Unit
@@ -28,20 +28,27 @@ namespace AWSRedrive.Tests.Unit
                 Configs = new List<ConfigurationEntry> {GetOneConfigurationEntry("#1", false)}
             };
 
-            var mockProcessor = new Mock<IQueueProcessor>(MockBehavior.Strict);
-            mockProcessor.Setup(x => x.Configuration).Returns(GetOneConfigurationEntry("#1", true)).Verifiable();
-            mockProcessor.Setup(x => x.Stop()).Verifiable();
+            var mockProcessor = A.Fake<IQueueProcessor>(x => x.Strict());
+            A.CallTo(() => mockProcessor.Configuration)
+                .Returns(GetOneConfigurationEntry("#1", true));
+            A.CallTo(() => mockProcessor.Stop())
+                .DoesNothing();
+            A.CallTo(() => mockProcessor.Equals(A<object>.Ignored))
+                .CallsBaseMethod();
+
             var processors = new List<IQueueProcessor>
             {
-                mockProcessor.Object
+                mockProcessor
             };
 
             configChangeManager.ReadChanges(config, processors, null, null, null);
             Assert.NotNull(processors);
             Assert.Empty(processors);
 
-            mockProcessor.VerifyGet(x => x.Configuration, Times.AtLeastOnce());
-            mockProcessor.Verify(x => x.Stop(), Times.Exactly(1));
+            A.CallTo(() => mockProcessor.Configuration)
+                .MustHaveHappenedOnceOrMore();
+            A.CallTo(() => mockProcessor.Stop())
+                .MustHaveHappenedOnceExactly();
         }
 
         [Theory]
@@ -55,45 +62,65 @@ namespace AWSRedrive.Tests.Unit
                 Configs = new List<ConfigurationEntry> { GetOneConfigurationEntry("#1", true) }
             };
 
-            var mockProcessor = new Mock<IQueueProcessor>(MockBehavior.Strict);
-            mockProcessor.SetupGet(x => x.Configuration).Returns(GetOneConfigurationEntry("#1", true));
-            mockProcessor.Setup(x => x.Start()).Verifiable();
-            mockProcessor.Setup(x => x.Init(It.IsAny<IQueueClient>(), It.IsAny<IMessageProcessorFactory>(), It.IsAny<ConfigurationEntry>())).Verifiable();
+            var mockProcessor = A.Fake<IQueueProcessor>(x => x.Strict());
+            A.CallTo(() => mockProcessor.Configuration)
+                .Returns(GetOneConfigurationEntry("#1", true));
+            A.CallTo(() => mockProcessor.Start())
+                .DoesNothing();
+            A.CallTo(() =>
+                    mockProcessor.Init(A<IQueueClient>.Ignored, A<IMessageProcessorFactory>.Ignored,
+                        A<ConfigurationEntry>.Ignored))
+                .DoesNothing();
 
-            var mockProcessorFactory = new Mock<IQueueProcessorFactory>(MockBehavior.Strict);
-            mockProcessorFactory.Setup(x => x.CreateQueueProcessor()).Returns(mockProcessor.Object).Verifiable();
+            var mockProcessorFactory = A.Fake<IQueueProcessorFactory>(x => x.Strict());
+            A.CallTo(() => mockProcessorFactory.CreateQueueProcessor())
+                .Returns(mockProcessor);
 
-            var mockClient = new Mock<IQueueClient>(MockBehavior.Strict);
-            mockClient.Setup(x => x.Init()).Verifiable();
+            var mockClient = A.Fake<IQueueClient>(x => x.Strict());
+            A.CallTo(() => mockClient.Init())
+                .DoesNothing();
 
-            var mockClientFactory = new Mock<IQueueClientFactory>(MockBehavior.Strict);
-            mockClientFactory.Setup(x => x.CreateClient(It.IsAny<ConfigurationEntry>())).Returns(mockClient.Object).Verifiable();
+            var mockClientFactory = A.Fake<IQueueClientFactory>(x => x.Strict());
+            A.CallTo(() => mockClientFactory.CreateClient(A<ConfigurationEntry>.Ignored))
+                .Returns(mockClient);
 
-            var mockMessageProcessorFactory = new Mock<IMessageProcessorFactory>(MockBehavior.Strict);
+            var mockMessageProcessorFactory = A.Fake<IMessageProcessorFactory>(x => x.Strict());
 
             var processors = new List<IQueueProcessor>();
-            configChangeManager.ReadChanges(config, processors, mockClientFactory.Object, mockMessageProcessorFactory.Object, mockProcessorFactory.Object);
+            configChangeManager.ReadChanges(config, processors, mockClientFactory, mockMessageProcessorFactory, mockProcessorFactory);
             Assert.NotNull(processors);
             Assert.Single(processors);
 
-            mockClient.Verify(x => x.Init(), Times.Exactly(1));
-            mockClientFactory.Verify(x => x.CreateClient(It.IsAny<ConfigurationEntry>()), Times.Exactly(1));
-            mockProcessorFactory.Verify(x => x.CreateQueueProcessor(), Times.Exactly(1));
-            mockProcessor.Verify(x => x.Start(), Times.Exactly(1));
-            mockProcessor.Verify(x => x.Init(It.IsAny<IQueueClient>(), It.IsAny<IMessageProcessorFactory>(), It.IsAny<ConfigurationEntry>()), Times.Exactly(1));
+            A.CallTo(() => mockClient.Init())
+                .MustHaveHappenedOnceExactly();
+            A.CallTo(() => mockClientFactory.CreateClient(A<ConfigurationEntry>.Ignored))
+                .MustHaveHappenedOnceExactly();
+            A.CallTo(() => mockProcessorFactory.CreateQueueProcessor())
+                .MustHaveHappenedOnceExactly();
+            A.CallTo(() => mockProcessor.Start())
+                .MustHaveHappenedOnceExactly();
+            A.CallTo(() =>
+                mockProcessor.Init(A<IQueueClient>.Ignored, A<IMessageProcessorFactory>.Ignored,
+                    A<ConfigurationEntry>.Ignored))
+                .MustHaveHappenedOnceExactly();
 
             if (readConfigurationAgain)
             {
-                configChangeManager.ReadChanges(config, processors, mockClientFactory.Object,
-                    mockMessageProcessorFactory.Object, mockProcessorFactory.Object);
+                configChangeManager.ReadChanges(config, processors, mockClientFactory,
+                    mockMessageProcessorFactory, mockProcessorFactory);
 
-                mockClient.Verify(x => x.Init(), Times.Exactly(1));
-                mockClientFactory.Verify(x => x.CreateClient(It.IsAny<ConfigurationEntry>()), Times.Exactly(1));
-                mockProcessorFactory.Verify(x => x.CreateQueueProcessor(), Times.Exactly(1));
-                mockProcessor.Verify(x => x.Start(), Times.Exactly(1));
-                mockProcessor.Verify(
-                    x => x.Init(It.IsAny<IQueueClient>(), It.IsAny<IMessageProcessorFactory>(),
-                        It.IsAny<ConfigurationEntry>()), Times.Exactly(1));
+                A.CallTo(() => mockClient.Init())
+                    .MustHaveHappenedOnceExactly();
+                A.CallTo(() => mockClientFactory.CreateClient(A<ConfigurationEntry>.Ignored))
+                    .MustHaveHappenedOnceExactly();
+                A.CallTo(() => mockProcessorFactory.CreateQueueProcessor())
+                    .MustHaveHappenedOnceExactly();
+                A.CallTo(() => mockProcessor.Start())
+                    .MustHaveHappenedOnceExactly();
+                A.CallTo(() =>
+                        mockProcessor.Init(A<IQueueClient>.Ignored, A<IMessageProcessorFactory>.Ignored,
+                            A<ConfigurationEntry>.Ignored))
+                    .MustHaveHappenedOnceExactly();
             }
         }
 
@@ -135,40 +162,61 @@ namespace AWSRedrive.Tests.Unit
                 Configs = new List<ConfigurationEntry> { GetOneConfigurationEntry("#1", true) }
             };
 
-            var mockNewProcessor = new Mock<IQueueProcessor>(MockBehavior.Strict);
-            mockNewProcessor.SetupGet(x => x.Configuration).Returns(GetOneConfigurationEntry("#1", true));
-            mockNewProcessor.Setup(x => x.Start()).Verifiable();
-            mockNewProcessor.Setup(x => x.Init(It.IsAny<IQueueClient>(), It.IsAny<IMessageProcessorFactory>(), It.IsAny<ConfigurationEntry>())).Verifiable();
+            var mockNewProcessor = A.Fake<IQueueProcessor>(x => x.Strict());
+            A.CallTo(() => mockNewProcessor.Configuration)
+                .Returns(GetOneConfigurationEntry("#1", true));
+            A.CallTo(() => mockNewProcessor.Start())
+                .DoesNothing();
+            A.CallTo(() => mockNewProcessor.Init(A<IQueueClient>.Ignored, A<IMessageProcessorFactory>.Ignored,
+                    A<ConfigurationEntry>.Ignored))
+                .DoesNothing();
+            A.CallTo(() => mockNewProcessor.Equals(A<object>.Ignored))
+                .CallsBaseMethod();
 
-            var mockProcessorFactory = new Mock<IQueueProcessorFactory>(MockBehavior.Strict);
-            mockProcessorFactory.Setup(x => x.CreateQueueProcessor()).Returns(mockNewProcessor.Object).Verifiable();
+            var mockProcessorFactory = A.Fake<IQueueProcessorFactory>(x => x.Strict());
+            A.CallTo(() => mockProcessorFactory.CreateQueueProcessor())
+                .Returns(mockNewProcessor);
 
-            var mockClient = new Mock<IQueueClient>(MockBehavior.Strict);
-            mockClient.Setup(x => x.Init()).Verifiable();
+            var mockClient = A.Fake<IQueueClient>(x => x.Strict());
+            A.CallTo(() => mockClient.Init())
+                .DoesNothing();
 
-            var mockClientFactory = new Mock<IQueueClientFactory>(MockBehavior.Strict);
-            mockClientFactory.Setup(x => x.CreateClient(It.IsAny<ConfigurationEntry>())).Returns(mockClient.Object).Verifiable();
+            var mockClientFactory = A.Fake<IQueueClientFactory>(x => x.Strict());
+            A.CallTo(() => mockClientFactory.CreateClient(A<ConfigurationEntry>.Ignored))
+                .Returns(mockClient);
 
-            var mockMessageProcessorFactory = new Mock<IMessageProcessorFactory>(MockBehavior.Strict);
+            var mockMessageProcessorFactory = A.Fake<IMessageProcessorFactory>(x => x.Strict());
 
-            var mockExistingProcessor = new Mock<IQueueProcessor>(MockBehavior.Strict);
-            mockExistingProcessor.Setup(x => x.Configuration).Returns(entryToUse).Verifiable();
-            mockExistingProcessor.Setup(x => x.Stop()).Verifiable();
+            var mockExistingProcessor = A.Fake<IQueueProcessor>(x => x.Strict());
+            A.CallTo(() => mockExistingProcessor.Configuration)
+                .Returns(entryToUse);
+            A.CallTo(() => mockExistingProcessor.Stop())
+                .DoesNothing();
+            A.CallTo(() => mockExistingProcessor.Equals(A<object>.Ignored))
+                .CallsBaseMethod();
             var processors = new List<IQueueProcessor>
             {
-                mockExistingProcessor.Object
+                mockExistingProcessor
             };
-            configChangeManager.ReadChanges(config, processors, mockClientFactory.Object, mockMessageProcessorFactory.Object, mockProcessorFactory.Object);
+            configChangeManager.ReadChanges(config, processors, mockClientFactory, mockMessageProcessorFactory, mockProcessorFactory);
             Assert.NotNull(processors);
             Assert.Single(processors);
 
-            mockClient.Verify(x => x.Init(), Times.Exactly(1));
-            mockClientFactory.Verify(x => x.CreateClient(It.IsAny<ConfigurationEntry>()), Times.Exactly(1));
-            mockProcessorFactory.Verify(x => x.CreateQueueProcessor(), Times.Exactly(1));
-            mockNewProcessor.Verify(x => x.Start(), Times.Exactly(1));
-            mockNewProcessor.Verify(x => x.Init(It.IsAny<IQueueClient>(), It.IsAny<IMessageProcessorFactory>(), It.IsAny<ConfigurationEntry>()), Times.Exactly(1));
-            mockExistingProcessor.VerifyGet(x => x.Configuration, Times.AtLeastOnce());
-            mockExistingProcessor.Verify(x => x.Stop(), Times.Exactly(1));
+            A.CallTo(() => mockClient.Init())
+                .MustHaveHappenedOnceExactly();
+            A.CallTo(() => mockClientFactory.CreateClient(A<ConfigurationEntry>.Ignored))
+                .MustHaveHappenedOnceExactly();
+            A.CallTo(() => mockProcessorFactory.CreateQueueProcessor())
+                .MustHaveHappenedOnceExactly();
+            A.CallTo(() => mockNewProcessor.Start())
+                .MustHaveHappenedOnceExactly();
+            A.CallTo(() => mockNewProcessor.Init(A<IQueueClient>.Ignored, A<IMessageProcessorFactory>.Ignored,
+                A<ConfigurationEntry>.Ignored))
+                .MustHaveHappenedOnceExactly();
+            A.CallTo(() => mockNewProcessor.Configuration)
+                .MustHaveHappenedOnceOrMore();
+            A.CallTo(() => mockExistingProcessor.Stop())
+                .MustHaveHappenedOnceExactly();
         }
 
         [Fact]
@@ -185,7 +233,7 @@ namespace AWSRedrive.Tests.Unit
                 }
             };
 
-            var mockedProcessors = new List<Mock<IQueueProcessor>>
+            var mockedProcessors = new List<IQueueProcessor>
             {
                 GetOneMockedProcessor(config.Configs[0]),
                 GetOneMockedProcessor(config.Configs[1]),
@@ -194,9 +242,9 @@ namespace AWSRedrive.Tests.Unit
 
             var processors = new List<IQueueProcessor>
             {
-                mockedProcessors[0].Object,
-                mockedProcessors[1].Object,
-                mockedProcessors[2].Object
+                mockedProcessors[0],
+                mockedProcessors[1],
+                mockedProcessors[2]
             };
 
             configChangeManager.ReadChanges(config, processors, null, null, null);
@@ -206,7 +254,8 @@ namespace AWSRedrive.Tests.Unit
             var count = 4;
             foreach (var processor in mockedProcessors)
             {
-                processor.VerifyGet(x => x.Configuration, Times.Exactly(count));
+                A.CallTo(() => processor.Configuration)
+                    .MustHaveHappened(count, Times.Exactly);
                 count--;
             }
         }
@@ -227,10 +276,11 @@ namespace AWSRedrive.Tests.Unit
             };
         }
 
-        private static Mock<IQueueProcessor> GetOneMockedProcessor(ConfigurationEntry config)
+        private static IQueueProcessor GetOneMockedProcessor(ConfigurationEntry config)
         {
-            var mockNewProcessor = new Mock<IQueueProcessor>(MockBehavior.Strict);
-            mockNewProcessor.SetupGet(x => x.Configuration).Returns(config);
+            var mockNewProcessor = A.Fake<IQueueProcessor>(x => x.Strict());
+            A.CallTo(() => mockNewProcessor.Configuration)
+                .Returns(config);
             return mockNewProcessor;
         }
     }
