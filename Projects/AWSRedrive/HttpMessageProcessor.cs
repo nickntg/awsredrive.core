@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using AWSRedrive.Interfaces;
 using Newtonsoft.Json.Linq;
 using NLog;
@@ -121,8 +120,7 @@ namespace AWSRedrive
             Logger.Trace($"Posting to {configurationEntry.RedriveUrl}");
             var response = client.ExecuteAsync(request).Result;
 
-            if (response.IsSuccessful &&
-                (response.StatusCode == HttpStatusCode.OK || response.StatusCode == HttpStatusCode.Created))
+            if (response.IsSuccessful)
             {
                 Logger.Trace($"Post to {configurationEntry.RedriveUrl} successful");
                 return;
