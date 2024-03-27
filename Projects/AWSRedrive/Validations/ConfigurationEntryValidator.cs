@@ -7,9 +7,25 @@ namespace AWSRedrive.Validations
         public ConfigurationEntryValidator()
         {
             RuleFor(x => x.QueueUrl).NotEmpty();
-            RuleFor(x => x.RedriveUrl).NotEmpty().When(x => string.IsNullOrEmpty(x.RedriveScript) && string.IsNullOrEmpty(x.RedriveKafkaTopic));
-            RuleFor(x => x.RedriveScript).NotEmpty().When(x => string.IsNullOrEmpty(x.RedriveUrl) && !string.IsNullOrEmpty(x.RedriveKafkaTopic));
-            RuleFor(x => x.RedriveKafkaTopic).NotEmpty().When(x => string.IsNullOrEmpty(x.RedriveUrl) && !string.IsNullOrEmpty(x.RedriveScript));
+            RuleFor(x => x)
+              .Custom((model, context) => {
+                int setCount = 0;
+                if (!string.IsNullOrEmpty(model.RedriveUrl)) {
+                  setCount++;
+                }
+                if (!string.IsNullOrEmpty(model.RedriveScript)) {
+                  setCount++;
+                }
+                if (!string.IsNullOrEmpty(model.RedriveKafkaTopic)) {
+                  setCount++;
+                }
+
+                if (setCount > 1) {
+                  context.AddFailure("Only one of RedriveUrl, RedriveScript or RedriveKafkaTopic can be specified.");
+                } else if (setCount == 0) {
+                  context.AddFailure("At least one of RedriveUrl, RedriveScript or RedriveKafkaTopic must be specified.");
+                }
+              });
             RuleFor(x => x.UseGET).Equal(false).When(x => x.UseDelete || x.UsePUT);
             RuleFor(x => x.UseDelete).Equal(false).When(x => x.UseGET || x.UsePUT);
             RuleFor(x => x.UsePUT).Equal(false).When(x => x.UseGET || x.UseDelete);
