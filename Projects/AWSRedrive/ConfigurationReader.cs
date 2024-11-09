@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using AWSRedrive.Interfaces;
+using AWSRedrive.Models;
 using AWSRedrive.Validations;
 using FluentValidation;
 using Newtonsoft.Json;

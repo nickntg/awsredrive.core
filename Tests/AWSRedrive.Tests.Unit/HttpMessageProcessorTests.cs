@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using AWSRedrive.Models;
 using RestSharp;
 using RestSharp.Authenticators;
 using Xunit;
@@ -151,7 +152,6 @@ namespace AWSRedrive.Tests.Unit
         {
             var processor = new HttpMessageProcessor();
 
-            var client = new RestClient();
             var options = processor.CreateOptions(new Uri("http://localhost"), new ConfigurationEntry
             {
                 BasicAuthPassword = useBasicAuth ? "abc" : string.Empty,
@@ -192,6 +192,50 @@ namespace AWSRedrive.Tests.Unit
             parameter = request.Parameters.TryFind("c");
             Assert.NotNull(parameter);
             Assert.Equal("d", parameter.Value);
+        }
+
+        [Fact]
+        public void NotTryingToUnpackMessageToDetermineAttributes()
+        {
+            var processor = new HttpMessageProcessor();
+
+            var request = new RestRequest();
+            processor.UnpackAttributesAsHeaders("not a json", request,
+                new ConfigurationEntry { UnpackAttributesAsHeaders = false });
+
+            Assert.Empty(request.Parameters);
+        }
+
+        [Fact]
+        public void VerifyNoErrorIfMessageIsNotSns()
+        {
+            var processor = new HttpMessageProcessor();
+
+            var request = new RestRequest();
+            processor.UnpackAttributesAsHeaders("not a json", request,
+                new ConfigurationEntry { UnpackAttributesAsHeaders = true });
+        }
+
+        [Fact]
+        public void VerifyUnpackAttributesAsHeaders()
+        {
+            var processor = new HttpMessageProcessor();
+
+            var request = new RestRequest();
+            processor.UnpackAttributesAsHeaders("{\"MessageAttributes\":{\"requestId\":{\"Value\":\"id\"},\"x-id\":{\"Value\":123}}}", request,
+                new ConfigurationEntry { UnpackAttributesAsHeaders = true });
+
+            Assert.Equal(2, request.Parameters.Count);
+
+            var parameter = request.Parameters.TryFind("requestId");
+            Assert.NotNull(parameter);
+            Assert.Equal("id", parameter.Value);
+            Assert.Equal(ParameterType.HttpHeader, parameter.Type);
+
+            parameter = request.Parameters.TryFind("x-id");
+            Assert.NotNull(parameter);
+            Assert.Equal("123", parameter.Value);
+            Assert.Equal(ParameterType.HttpHeader, parameter.Type);
         }
     }
 }

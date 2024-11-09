@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using AWSRedrive.Interfaces;
+using AWSRedrive.Models;
 using Newtonsoft.Json;
 using NLog;
 

@@ -7,6 +7,7 @@ using Amazon;
 using Amazon.SQS;
 using Amazon.SQS.Model;
 using AWSRedrive.Interfaces;
+using AWSRedrive.Models;
 
 namespace AWSRedrive
 {

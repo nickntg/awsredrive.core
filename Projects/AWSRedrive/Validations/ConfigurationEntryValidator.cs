@@ -1,4 +1,5 @@
-﻿using FluentValidation;
+﻿using AWSRedrive.Models;
+using FluentValidation;
 
 namespace AWSRedrive.Validations
 {

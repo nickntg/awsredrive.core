@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using AWSRedrive.Interfaces;
+using AWSRedrive.Models;
 using Confluent.Kafka;
 using NLog;
 

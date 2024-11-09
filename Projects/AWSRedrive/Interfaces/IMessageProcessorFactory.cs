@@ -1,4 +1,6 @@
-﻿namespace AWSRedrive.Interfaces
+﻿using AWSRedrive.Models;
+
+namespace AWSRedrive.Interfaces
 {
     public interface IMessageProcessorFactory
     {

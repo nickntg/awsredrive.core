@@ -2,6 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using AWSRedrive.Interfaces;
+using AWSRedrive.Models;
 using NLog;
 
 namespace AWSRedrive

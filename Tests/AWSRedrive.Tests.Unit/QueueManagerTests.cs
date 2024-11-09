@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Threading;
 using AWSRedrive.Interfaces;
+using AWSRedrive.Models;
 using FakeItEasy;
 using Xunit;
 
