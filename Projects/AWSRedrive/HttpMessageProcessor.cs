@@ -78,7 +78,7 @@ namespace AWSRedrive
 
             if (configurationEntry.Timeout.HasValue)
             {
-                options.MaxTimeout = configurationEntry.Timeout.Value;
+                options.Timeout = TimeSpan.FromMilliseconds(configurationEntry.Timeout.Value);
             }
 
             if (!string.IsNullOrEmpty(configurationEntry.BasicAuthPassword) &&
