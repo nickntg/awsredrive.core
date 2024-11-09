@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Net;
+using AWSRedrive.Models;
 using Xunit;
 
 namespace AWSRedrive.Test.Integration
