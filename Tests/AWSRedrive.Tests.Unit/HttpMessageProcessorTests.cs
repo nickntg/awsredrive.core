@@ -93,7 +93,8 @@ namespace AWSRedrive.Tests.Unit
             var options =
                 processor.CreateOptions(new Uri("http://localhost/v"), new ConfigurationEntry { Timeout = 1234 });
 
-            Assert.Equal(1234, options.MaxTimeout);
+            Assert.NotNull(options.Timeout);
+            Assert.Equal(1234, options.Timeout.Value.TotalMilliseconds);
         }
 
         [Theory]
