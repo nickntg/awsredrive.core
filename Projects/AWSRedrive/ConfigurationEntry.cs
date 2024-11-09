@@ -3,6 +3,7 @@
     public class ConfigurationEntry
     {
         public string Alias { get; set; }
+        public string Profile { get; set; }
         public string AccessKey { get; set; }
         public string SecretKey { get; set; }
         public string QueueUrl { get; set; }
