@@ -1,22 +1,22 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
 	<ProjectGuid>{E2CEBBAF-6DF7-41E9-815D-9AD4CF90C844}</ProjectGuid>
 	<Version>1.0.13</Version>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="AWSSDK.SQS" Version="3.7.200.65" />
-    <PackageReference Include="Confluent.Kafka" Version="2.3.0" />
-    <PackageReference Include="FluentValidation" Version="11.8.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.1" />
-    <PackageReference Include="Microsoft.PowerShell.Commands.Diagnostics" Version="7.2.16" />
-    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.3.9" />
-    <PackageReference Include="Microsoft.WSMan.Management" Version="7.2.16" />
+    <PackageReference Include="AWSSDK.SQS" Version="3.7.400.47" />
+    <PackageReference Include="Confluent.Kafka" Version="2.6.0" />
+    <PackageReference Include="FluentValidation" Version="11.10.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="Microsoft.PowerShell.Commands.Diagnostics" Version="7.4.6" />
+    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.4.6" />
+    <PackageReference Include="Microsoft.WSMan.Management" Version="7.4.6" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="NLog" Version="5.2.5" />
-    <PackageReference Include="RestSharp" Version="112.0.0" />
+    <PackageReference Include="NLog" Version="5.3.4" />
+    <PackageReference Include="RestSharp" Version="112.1.0" />
   </ItemGroup>
 
   <ItemGroup>
