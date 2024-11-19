@@ -44,4 +44,5 @@ Here are the elements of a configuration entry:
 * **UsePUT**. If set to True, AWSRedrive will use PUT instead of POST when sending messages to the configured service endpoint.
 * **Timeout**. Service timeout in milliseconds to observe when sending messages to the configured service endpoint.
 * **IgnoreCertificateErrors**. If set to True, AWSRedrive will ignore any certificate errors when connecting to the configured service endpoint.
+* **UnpackAttributesAsHeaders**. If set to True, AWSRedrive will try to treat the incoming message as being an [SNS envelope](https://docs.aws.amazon.com/sns/latest/dg/sns-message-and-json-formats.html), then unpack message attributes and transfer them as HTTP headers.
 * **ServiceUrl**. If configured, this value will be passed to the ServiceURL property of the AWS SDK. This is useful when working with [LocalStack](https://localstack.cloud/) instead of AWS.
