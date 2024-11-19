@@ -1,4 +1,5 @@
-﻿using AWSRedrive.Validations;
+﻿using AWSRedrive.Models;
+using AWSRedrive.Validations;
 using Xunit;
 
 namespace AWSRedrive.Tests.Unit

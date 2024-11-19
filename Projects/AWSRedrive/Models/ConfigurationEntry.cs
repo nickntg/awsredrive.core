@@ -1,8 +1,9 @@
-﻿namespace AWSRedrive
+﻿namespace AWSRedrive.Models
 {
     public class ConfigurationEntry
     {
         public string Alias { get; set; }
+        public string Profile { get; set; }
         public string AccessKey { get; set; }
         public string SecretKey { get; set; }
         public string QueueUrl { get; set; }
@@ -23,6 +24,7 @@
         public bool UseDelete { get; set; }
         public int? Timeout { get; set; }
         public bool IgnoreCertificateErrors { get; set; }
+        public bool UnpackAttributesAsHeaders { get; set; }
         public string ServiceUrl { get; set; }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using AWSRedrive.Interfaces;
+using AWSRedrive.Models;
 
 namespace AWSRedrive.Tests.Unit.Helpers
 {

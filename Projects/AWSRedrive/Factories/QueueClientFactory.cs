@@ -1,4 +1,5 @@
 ﻿using AWSRedrive.Interfaces;
+using AWSRedrive.Models;
 
 namespace AWSRedrive.Factories
 {

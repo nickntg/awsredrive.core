@@ -1,4 +1,5 @@
 ﻿using AWSRedrive.Factories;
+using AWSRedrive.Models;
 using Xunit;
 
 namespace AWSRedrive.Tests.Unit

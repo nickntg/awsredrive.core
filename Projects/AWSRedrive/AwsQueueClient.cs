@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -7,6 +6,7 @@ using Amazon;
 using Amazon.SQS;
 using Amazon.SQS.Model;
 using AWSRedrive.Interfaces;
+using AWSRedrive.Models;
 
 namespace AWSRedrive
 {
@@ -28,15 +28,23 @@ namespace AWSRedrive
                 config.RegionEndpoint = RegionEndpoint.GetBySystemName(ConfigurationEntry.Region);
             }
 
+            if (!string.IsNullOrEmpty(ConfigurationEntry.Profile) && 
+                string.IsNullOrEmpty(ConfigurationEntry.AccessKey) &&
+                string.IsNullOrEmpty(ConfigurationEntry.SecretKey))
+            {
+                // Configured profile.
+                config.Profile = new Profile(ConfigurationEntry.Profile);
+            }
+
             if (string.IsNullOrEmpty(ConfigurationEntry.AccessKey) &&
                 string.IsNullOrEmpty(ConfigurationEntry.SecretKey))
             {
-                // AWS credentials set either in configuration or for the machine running this.
+                // Configured profile or default profile.
                 _client = new AmazonSQSClient(config);
             }
             else
             {
-                // Explicit AWS credentials.
+                // Explicit credentials.
                 _client = new AmazonSQSClient(ConfigurationEntry.AccessKey,
                     ConfigurationEntry.SecretKey,
                     config);
@@ -55,7 +63,8 @@ namespace AWSRedrive
                 MaxNumberOfMessages = 1,
                 QueueUrl = ConfigurationEntry.QueueUrl,
                 WaitTimeSeconds = 20,
-                MessageAttributeNames = new List<string> {"*"}
+                MessageAttributeNames = ["*"],
+                MessageSystemAttributeNames = ["SentTimestamp"]
             };
 
             using (var source = new CancellationTokenSource(20 * 1000))
@@ -65,10 +74,15 @@ namespace AWSRedrive
                     var response = await _client.ReceiveMessageAsync(request, source.Token);
                     if (response?.Messages?.Count >= 1)
                     {
-                        return new SqsMessage(response.Messages[0].ReceiptHandle,
-                            response.Messages[0].Body,
-                            (response.Messages[0].MessageAttributes)
-                                .ToDictionary(item => item.Key, item => item.Value.StringValue));
+                        var attributes = response.Messages[0].MessageAttributes
+                            .ToDictionary(item => item.Key, item => item.Value.StringValue);
+
+                        foreach (var item in response.Messages[0].Attributes)
+                        {
+                            attributes.Add(item.Key, item.Value);
+                        }
+
+                        return new SqsMessage(response.Messages[0].ReceiptHandle, response.Messages[0].Body, attributes);
                     }
 
                     return null;

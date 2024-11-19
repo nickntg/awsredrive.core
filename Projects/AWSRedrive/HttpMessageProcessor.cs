@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using AWSRedrive.Interfaces;
+using AWSRedrive.Models;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using NLog;
 using RestSharp;
@@ -28,7 +30,39 @@ namespace AWSRedrive
 
             AddAttributes(request, attributes);
 
+            UnpackAttributesAsHeaders(message, request, configurationEntry);
+
             SendRequest(client, request, configurationEntry);
+        }
+
+        public void UnpackAttributesAsHeaders(string message, RestRequest request, ConfigurationEntry configurationEntry)
+        {
+            if (!configurationEntry.UnpackAttributesAsHeaders)
+            {
+                return;
+            }
+
+            try
+            {
+                var snsEnvelope = JsonConvert.DeserializeObject<SnsEnvelope>(message);
+                if (snsEnvelope.MessageAttributes is null)
+                {
+                    return;
+                }
+
+                foreach (var attribute in snsEnvelope.MessageAttributes)
+                {
+                    var value = attribute.Value.Value.ToString();
+                    if (!string.IsNullOrEmpty(value))
+                    {
+                        request.AddHeader(attribute.Key, value);
+                    }
+                }
+            }
+            catch
+            {
+                // Ignored.
+            }
         }
 
         public RestRequest CreateRequest(string message, Uri uri, ConfigurationEntry configurationEntry)
@@ -78,7 +112,7 @@ namespace AWSRedrive
 
             if (configurationEntry.Timeout.HasValue)
             {
-                options.MaxTimeout = configurationEntry.Timeout.Value;
+                options.Timeout = TimeSpan.FromMilliseconds(configurationEntry.Timeout.Value);
             }
 
             if (!string.IsNullOrEmpty(configurationEntry.BasicAuthPassword) &&

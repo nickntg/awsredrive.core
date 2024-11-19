@@ -3,6 +3,7 @@ using System.IO;
 using System.Management.Automation;
 using System.Text;
 using AWSRedrive.Interfaces;
+using AWSRedrive.Models;
 using NLog;
 
 namespace AWSRedrive
