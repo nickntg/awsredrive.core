@@ -54,7 +54,7 @@ namespace AWSRedrive
             try
             {
                 _cancellation.Cancel();
-                Task.WaitAll(new[] {_task}, 30 * 1000);
+                Task.WaitAll([_task], 30 * 1000);
                 _cancellation.Dispose();
                 _task.Dispose();
             }

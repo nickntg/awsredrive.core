@@ -13,7 +13,7 @@ namespace AWSRedrive.Tests.Unit
         public void DoesNothingWithoutConfigurationAndWithoutProcessors()
         {
             var configChangeManager = new ConfigurationChangeManager();
-            var config = new SimpleConfigurationReader {Configs = new List<ConfigurationEntry>()};
+            var config = new SimpleConfigurationReader {Configs = [] };
             var processors = new List<IQueueProcessor>();
             configChangeManager.ReadChanges(config, processors, null, null, null);
             Assert.NotNull(processors);
@@ -26,7 +26,7 @@ namespace AWSRedrive.Tests.Unit
             var configChangeManager = new ConfigurationChangeManager();
             var config = new SimpleConfigurationReader
             {
-                Configs = new List<ConfigurationEntry> {GetOneConfigurationEntry("#1", false)}
+                Configs = [GetOneConfigurationEntry("#1", false)]
             };
 
             var mockProcessor = A.Fake<IQueueProcessor>(x => x.Strict());
@@ -60,7 +60,7 @@ namespace AWSRedrive.Tests.Unit
             var configChangeManager = new ConfigurationChangeManager();
             var config = new SimpleConfigurationReader
             {
-                Configs = new List<ConfigurationEntry> { GetOneConfigurationEntry("#1", true) }
+                Configs = [GetOneConfigurationEntry("#1", true)]
             };
 
             var mockProcessor = A.Fake<IQueueProcessor>(x => x.Strict());
@@ -131,7 +131,7 @@ namespace AWSRedrive.Tests.Unit
             var configChangeManager = new ConfigurationChangeManager();
             var config = new SimpleConfigurationReader
             {
-                Configs = new List<ConfigurationEntry> { GetOneConfigurationEntry("#1", false) }
+                Configs = [GetOneConfigurationEntry("#1", false)]
             };
 
             var processors = new List<IQueueProcessor>();
@@ -160,7 +160,7 @@ namespace AWSRedrive.Tests.Unit
             var configChangeManager = new ConfigurationChangeManager();
             var config = new SimpleConfigurationReader
             {
-                Configs = new List<ConfigurationEntry> { GetOneConfigurationEntry("#1", true) }
+                Configs = [GetOneConfigurationEntry("#1", true)]
             };
 
             var mockNewProcessor = A.Fake<IQueueProcessor>(x => x.Strict());
@@ -226,12 +226,12 @@ namespace AWSRedrive.Tests.Unit
             var configChangeManager = new ConfigurationChangeManager();
             var config = new SimpleConfigurationReader
             {
-                Configs = new List<ConfigurationEntry>
-                {
+                Configs =
+                [
                     GetOneConfigurationEntry("#1", true),
                     GetOneConfigurationEntry("#2", true),
                     GetOneConfigurationEntry("#3", true)
-                }
+                ]
             };
 
             var mockedProcessors = new List<IQueueProcessor>

@@ -67,7 +67,7 @@ namespace AWSRedrive
 
         public RestRequest CreateRequest(string message, Uri uri, ConfigurationEntry configurationEntry)
         {
-            return !configurationEntry.UseGET 
+            return !configurationEntry.UseGet 
                 ? CreatePostOrPutOrDeleteRequest(message, uri, configurationEntry) 
                 : CreateGetRequest(message, uri);
         }
@@ -85,7 +85,7 @@ namespace AWSRedrive
             }
             catch (Exception ex)
             {
-                Logger.Warn(ex, $"Error parsing message and adding query parameters. GET request might be incorrect.");
+                Logger.Warn(ex, "Error parsing message and adding query parameters. GET request might be incorrect.");
                 Logger.Warn($"Message was [{message}]");
             }
 
@@ -94,7 +94,7 @@ namespace AWSRedrive
 
         public RestRequest CreatePostOrPutOrDeleteRequest(string message, Uri uri, ConfigurationEntry configurationEntry)
         {
-            var request = new RestRequest(uri.PathAndQuery, configurationEntry.UseDelete ? Method.Delete : configurationEntry.UsePUT ? Method.Put : Method.Post);
+            var request = new RestRequest(uri.PathAndQuery, configurationEntry.UseDelete ? Method.Delete : configurationEntry.UsePut ? Method.Put : Method.Post);
 
             request.AddStringBody(message, DataFormat.Json);
 

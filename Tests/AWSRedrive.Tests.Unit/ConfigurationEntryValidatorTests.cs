@@ -74,21 +74,21 @@ namespace AWSRedrive.Tests.Unit
             {
                 QueueUrl = "queue url",
                 RedriveUrl = "redrive url",
-                UseGET = true,
-                UsePUT = true
+                UseGet = true,
+                UsePut = true
             };
             var result = validator.Validate(entry);
 
             Assert.False(result.IsValid);
-            Assert.Contains("Use GET", result.Errors[0].ErrorMessage);
+            Assert.Contains("Use Get", result.Errors[0].ErrorMessage);
 
-            entry.UsePUT = false;
+            entry.UsePut = false;
             entry.UseDelete = true;
 
             result = validator.Validate(entry);
 
             Assert.False(result.IsValid);
-            Assert.Contains("Use GET", result.Errors[0].ErrorMessage);
+            Assert.Contains("Use Get", result.Errors[0].ErrorMessage);
         }
 
         [Fact]
@@ -100,7 +100,7 @@ namespace AWSRedrive.Tests.Unit
                 QueueUrl = "queue url",
                 RedriveUrl = "redrive url",
                 UseDelete = true,
-                UsePUT = true
+                UsePut = true
             };
             var result = validator.Validate(entry);
 

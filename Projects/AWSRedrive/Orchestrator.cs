@@ -30,7 +30,7 @@ namespace AWSRedrive
         {
             DetermineConfigurationLocation();
             
-            _processors = new List<IQueueProcessor>();
+            _processors = [];
             _cancellation = new CancellationTokenSource();
             _task = new Task(StartProcessing, _cancellation.Token);
             _task.Start();

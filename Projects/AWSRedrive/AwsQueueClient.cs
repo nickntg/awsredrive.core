@@ -104,7 +104,7 @@ namespace AWSRedrive
             DeleteMessageInternalAsync(message);
         }
 
-        private async void DeleteMessageInternalAsync(IMessage message)
+        private void DeleteMessageInternalAsync(IMessage message)
         {
             var request = new DeleteMessageRequest
             {
@@ -114,7 +114,7 @@ namespace AWSRedrive
 
             using (var source = new CancellationTokenSource(20 * 1000))
             {
-                await _client.DeleteMessageAsync(request, source.Token);
+                _ = _client.DeleteMessageAsync(request, source.Token).Result;
             }
         }
 

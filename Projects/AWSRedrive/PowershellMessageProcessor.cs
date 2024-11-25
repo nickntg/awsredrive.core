@@ -29,14 +29,9 @@ namespace AWSRedrive
                 }
 
                 var logString = sb.ToString();
-                if (!string.IsNullOrEmpty(logString))
-                {
-                    Logger.Debug($"Script output: {logString}");
-                }
-                else
-                {
-                    Logger.Debug("No script output was produced");
-                }
+                Logger.Debug(!string.IsNullOrEmpty(logString)
+                    ? $"Script output: {logString}"
+                    : "No script output was produced");
             }
         }
     }

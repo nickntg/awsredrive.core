@@ -27,9 +27,9 @@ namespace AWSRedrive.Validations
                   context.AddFailure("At least one of RedriveUrl, RedriveScript or RedriveKafkaTopic must be specified.");
                 }
               });
-            RuleFor(x => x.UseGET).Equal(false).When(x => x.UseDelete || x.UsePUT);
-            RuleFor(x => x.UseDelete).Equal(false).When(x => x.UseGET || x.UsePUT);
-            RuleFor(x => x.UsePUT).Equal(false).When(x => x.UseGET || x.UseDelete);
+            RuleFor(x => x.UseGet).Equal(false).When(x => x.UseDelete || x.UsePut);
+            RuleFor(x => x.UseDelete).Equal(false).When(x => x.UseGet || x.UsePut);
+            RuleFor(x => x.UsePut).Equal(false).When(x => x.UseGet || x.UseDelete);
         }
     }
 }

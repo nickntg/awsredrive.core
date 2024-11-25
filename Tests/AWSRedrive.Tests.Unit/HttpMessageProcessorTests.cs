@@ -57,11 +57,11 @@ namespace AWSRedrive.Tests.Unit
             switch (verb.ToLower())
             {
                 case "get": 
-                    entry.UseGET = true;
+                    entry.UseGet = true;
                     method = Method.Get;
                     break;
                 case "put":
-                    entry.UsePUT = true;
+                    entry.UsePut = true;
                     method = Method.Put;
                     break;
                 case "delete":

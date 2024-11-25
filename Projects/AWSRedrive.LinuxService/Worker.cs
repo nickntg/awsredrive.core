@@ -7,22 +7,16 @@ using NLog;
 
 namespace AWSRedrive.LinuxService
 {
-    public class Worker : BackgroundService
+    public class Worker(IOrchestrator orchestrator) : BackgroundService
     {
-        private readonly NLog.ILogger  _logger = LogManager.GetCurrentClassLogger();
-        private readonly IOrchestrator _orchestrator;
-
-        public Worker(IOrchestrator orchestrator)
-        {
-            _orchestrator = orchestrator;
-        }
+        private readonly ILogger  _logger = LogManager.GetCurrentClassLogger();
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             try
             {
                 _logger.Info("Service starting orchestrator");
-                _orchestrator.Start();
+                orchestrator.Start();
 
                 _logger.Info("Orchestrator started");
                 while (!stoppingToken.IsCancellationRequested)
@@ -31,7 +25,7 @@ namespace AWSRedrive.LinuxService
                 }
 
                 _logger.Info("Stop requested, stopping orchestrator");
-                _orchestrator.Stop();
+                orchestrator.Stop();
                 _logger.Info("Orchestrator stopped");
             }
             catch (Exception ex)

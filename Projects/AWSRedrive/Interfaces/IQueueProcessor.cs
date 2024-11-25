@@ -11,6 +11,5 @@ namespace AWSRedrive.Interfaces
         );
         void Start();
         void Stop();
-        void ProcessMessageLoop();
     }
 }
