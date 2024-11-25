@@ -12,5 +12,10 @@ namespace AWSRedrive.Tests.Unit.Helpers
         {
             return Configs;
         }
+
+        public bool CanBeUsed()
+        {
+            return true;
+        }
     }
 }

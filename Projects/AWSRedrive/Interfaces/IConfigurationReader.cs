@@ -6,5 +6,6 @@ namespace AWSRedrive.Interfaces
     public interface IConfigurationReader
     { 
         List<ConfigurationEntry> ReadConfiguration();
+        bool CanBeUsed();
     }
 }

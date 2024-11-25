@@ -10,16 +10,14 @@ using NLog;
 
 namespace AWSRedrive
 {
-    public class ConfigurationReader : IConfigurationReader
+    public class LocalConfigurationReader : IConfigurationReader
     {
-        private const string ConfigurationFile = "config.json";
-
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         public List<ConfigurationEntry> ReadConfiguration()
         {
-            Logger.Trace($"Reading {ConfigurationFile}");
-            var contents = File.ReadAllText(ConfigurationFile, System.Text.Encoding.Default);
+            Logger.Trace($"Reading {Constants.LocalConfigurationFile}");
+            var contents = File.ReadAllText(Constants.LocalConfigurationFile, System.Text.Encoding.Default);
             var list = JsonConvert.DeserializeObject<ConfigurationEntry[]>(contents).ToList();
 
             var validator = new ConfigurationEntryValidator();
@@ -39,6 +37,11 @@ namespace AWSRedrive
             }
 
             return list;
+        }
+
+        public bool CanBeUsed()
+        {
+            return File.Exists(Constants.LocalConfigurationFile);
         }
     }
 }
