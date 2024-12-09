@@ -14,6 +14,7 @@ namespace AWSRedrive
     public class HttpMessageProcessor : IMessageProcessor
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        private readonly string[] _ignoredHeaders = ["content-length", "host", "accept-encoding", "content-type", "accept"];
 
         public void ProcessMessage(string message, Dictionary<string, string> attributes, ConfigurationEntry configurationEntry)
         {
@@ -55,7 +56,10 @@ namespace AWSRedrive
                     var value = attribute.Value.Value.ToString();
                     if (!string.IsNullOrEmpty(value))
                     {
-                        request.AddHeader(attribute.Key, value);
+                        if (!_ignoredHeaders.Contains(attribute.Key.ToLower()))
+                        {
+                            request.AddHeader(attribute.Key, value);
+                        }
                     }
                 }
             }
@@ -144,7 +148,10 @@ namespace AWSRedrive
             {
                 foreach (var key in attributes.Keys.Where(key => !string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(attributes[key])))
                 {
-                    request.AddHeader(key, attributes[key]);
+                    if (!_ignoredHeaders.Contains(key.ToLower()))
+                    {
+                        request.AddHeader(key, attributes[key]);
+                    }
                 }
             }
         }
