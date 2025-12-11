@@ -9,17 +9,30 @@ namespace AWSRedrive
 {
     public class QueueProcessor : IQueueProcessor
     {
+        private const int MaxMessageContentSize = 100 * 1024; // 100KB
+
         public ConfigurationEntry Configuration { get; set; }
 
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        private readonly IMetricsSettings _metricsSettings;
+        private readonly Logger _metricsLogger;
+        private readonly Logger _entryLogger;
 
+        private EntryLogger _logger;
         private IQueueClient _queueClient;
         private IMessageProcessorFactory _messageProcessorFactory;
         private Task _task;
         private CancellationTokenSource _cancellation;
-        private int _messagesReceived;
-        private int _messagesSent;
-        private int _messagesFailed;
+        private QueueMetrics _metrics;
+        private DateTime _lastMetricsLog;
+
+        public QueueProcessor(IMetricsSettings metricsSettings)
+        {
+            _metricsSettings = metricsSettings ?? new MetricsSettingsProvider(null);
+            _metricsLogger = LogManager.GetLogger("Metrics");
+            _entryLogger = LogManager.GetLogger("Entry");
+        }
+
+        public QueueProcessor() : this(null) { }
 
         public void Init(IQueueClient queueClient, 
             IMessageProcessorFactory messageProcessorFactory, 
@@ -28,43 +41,69 @@ namespace AWSRedrive
             Configuration = configuration;
             _queueClient = queueClient;
             _messageProcessorFactory = messageProcessorFactory;
+            _logger = new EntryLogger(configuration.Alias, configuration.LogLevel);
+            _metrics = MetricsStore.GetOrCreate(configuration.Alias);
+            _lastMetricsLog = DateTime.UtcNow;
+        }
+
+        public void SetLogLevel(string level)
+        {
+            _logger.SetLogLevel(level);
+            Configuration.LogLevel = level;
+            _logger.Info($"Log level changed to {level}");
+        }
+
+        public string GetLogLevel()
+        {
+            return _logger.CurrentLogLevel;
         }
 
         public void Start()
         {
             if (_task != null)
             {
-                Logger.Info($"Queue processor [{Configuration.Alias}] is already started");
+                _logger.Debug("Already started");
                 return;
             }
 
+            _metrics.StartedAt = DateTime.UtcNow;
             _cancellation = new CancellationTokenSource();
             _task = new Task(ProcessMessageLoop, _cancellation.Token, TaskCreationOptions.LongRunning);
             _task.Start();
+
+            if (_metricsSettings.Enabled)
+            {
+                LogMetrics("STARTED");
+            }
         }
 
         public void Stop()
         {
             if (_task == null)
             {
-                Logger.Info($"Queue processor [{Configuration.Alias}] is already stopped");
+                _logger.Debug("Already stopped");
                 return;
             }
 
             try
             {
                 _cancellation.Cancel();
-                Task.WaitAll(new[] {_task}, 30 * 1000);
+                Task.WaitAll(new[] { _task }, 30 * 1000);
                 _cancellation.Dispose();
                 _task.Dispose();
             }
             catch (Exception e)
             {
-                Logger.Warn($"Queue processor [{Configuration.Alias}] has not stopped gracefully - {e}");
+                _logger.Warn($"Not stopped gracefully - {e}");
             }
             finally
             {
                 _task = null;
+
+                if (_metricsSettings.Enabled)
+                {
+                    LogMetrics("STOPPED");
+                }
             }
         }
 
@@ -72,65 +111,134 @@ namespace AWSRedrive
         {
             while (!_cancellation.IsCancellationRequested)
             {
+                CheckPeriodicMetrics();
+
                 IMessage msg;
 
                 try
                 {
-                    Logger.Debug($"Waiting for message, queue processor [{Configuration.Alias}]");
+                    _logger.Debug("Waiting for message");
                     msg = _queueClient.GetMessage();
                     if (msg == null)
                     {
-                        Logger.Debug($"No message received, queue processor [{Configuration.Alias}]");
+                        _logger.Debug("No message");
                         continue;
                     }
                 }
                 catch (Exception e)
                 {
-                    Logger.Error($"Queue processor [{Configuration.Alias}], error waiting for queue message - {e}");
+                    LogError("Queue error", e);
+                    _metrics.LastError = DateTime.UtcNow;
+                    _metrics.LastErrorMessage = e.Message;
                     continue;
                 }
 
-                _messagesReceived++;
+                _metrics.MessagesReceived++;
+                _metrics.LastMessageReceived = DateTime.UtcNow;
+                _metrics.LastMessageContent = TruncateMessage(msg.Content);
 
-                Logger.Debug($"Message received, queue processor [{Configuration.Alias}]");
-                if (Logger.IsTraceEnabled)
+                _logger.Debug("Message received");
+                if (_logger.IsTraceEnabled)
                 {
-                    Logger.Trace($"[{Configuration.Alias}]: {msg.Content}");
+                    _logger.Trace($"Content: {msg.Content}");
                 }
 
                 try
                 {
-                    Logger.Debug($"Processing message, queue processor [{Configuration.Alias}], url {Configuration.RedriveUrl}");
-                    var messageProcessor = _messageProcessorFactory.CreateMessageProcessor(Configuration);
-                    Logger.Debug($"Using {messageProcessor.GetType()} processor");
-                    messageProcessor.ProcessMessage(msg.Content, msg.Attributes, Configuration);
-                    Logger.Debug($"Processing complete, queue processor [{Configuration.Alias}]");
+                    _logger.Debug($"Processing to {Configuration.RedriveUrl}");
+                    var processor = _messageProcessorFactory.CreateMessageProcessor(Configuration);
+                    processor.ProcessMessage(msg.Content, msg.Attributes, Configuration, _logger);
+                    _logger.Debug("Processed");
 
-                    _messagesSent++;
+                    _metrics.MessagesSent++;
+                    _metrics.LastMessageSent = DateTime.UtcNow;
 
                     try
                     {
-                        Logger.Debug($"Deleting message, queue processor [{Configuration.Alias}], id [{msg.MessageIdentifier}]");
+                        _logger.Debug($"Deleting [{msg.MessageIdentifier}]");
                         _queueClient.DeleteMessage(msg);
-                        Logger.Debug($"Message deleted, queue processor [{Configuration.Alias}], id [{msg.MessageIdentifier}]");
+                        _logger.Debug("Deleted");
                     }
                     catch (Exception e)
                     {
-                        Logger.Error($"Could not delete message [{msg.MessageIdentifier}, queue processor [{Configuration.Alias}] - MESSAGE REMAINS IN QUEUE! - {e}");
+                        LogError($"Delete failed [{msg.MessageIdentifier}]", e);
+                        _metrics.LastError = DateTime.UtcNow;
+                        _metrics.LastErrorMessage = e.Message;
                     }
                 }
                 catch (Exception e)
                 {
-                    _messagesFailed++;
+                    _metrics.MessagesFailed++;
+                    _metrics.LastError = DateTime.UtcNow;
+                    _metrics.LastErrorMessage = e.Message;
 
-                    Logger.Error($"Error processing message [{msg.MessageIdentifier}[, queue processor [{Configuration.Alias}] - {e}");
-                    Logger.Error($"Message [{msg.MessageIdentifier}[, queue processor [{Configuration.Alias}] follows \r\n{msg.Content}");
-                }
-                finally
-                {
-                    Logger.Info($"Queue processor [{Configuration.Alias}], messages received {_messagesReceived}, sent {_messagesSent}, failed {_messagesFailed}");
+                    LogError($"Process failed [{msg.MessageIdentifier}]", e, msg.Content);
                 }
             }
+        }
+
+        private static string TruncateMessage(string content)
+        {
+            if (string.IsNullOrEmpty(content))
+                return content;
+
+            if (content.Length <= MaxMessageContentSize)
+                return content;
+
+            return content.Substring(0, MaxMessageContentSize) + $"... [truncated, original size: {content.Length:N0} bytes]";
+        }
+
+        private void CheckPeriodicMetrics()
+        {
+            if (!_metricsSettings.Enabled) return;
+
+            var now = DateTime.UtcNow;
+            if ((now - _lastMetricsLog).TotalSeconds >= _metricsSettings.IntervalSeconds)
+            {
+                LogMetrics("METRICS");
+                _lastMetricsLog = now;
+            }
+        }
+
+        private void LogMetrics(string eventType)
+        {
+            var uptime = DateTime.UtcNow - _metrics.StartedAt;
+
+            var evt = new LogEventInfo(LogLevel.Info, "Metrics", eventType);
+            evt.Properties["alias"] = Configuration.Alias;
+            evt.Properties["eventType"] = eventType;
+            evt.Properties["uptimeSeconds"] = (int)uptime.TotalSeconds;
+            evt.Properties["messagesReceived"] = _metrics.MessagesReceived;
+            evt.Properties["messagesSent"] = _metrics.MessagesSent;
+            evt.Properties["messagesFailed"] = _metrics.MessagesFailed;
+            evt.Properties["queueUrl"] = Configuration.QueueUrl;
+            evt.Properties["region"] = Configuration.Region;
+            evt.Properties["redriveUrl"] = Configuration.RedriveUrl;
+            evt.Properties["logLevel"] = _logger.CurrentLogLevel;
+
+            _metricsLogger.Log(evt);
+        }
+
+        private void LogError(string message, Exception ex, string messageContent = null)
+        {
+            var loggerName = "QueueProcessor";
+            var logger = LogManager.GetLogger(loggerName);
+            
+            var evt = new LogEventInfo(LogLevel.Error, loggerName, message);
+            evt.Properties["alias"] = Configuration.Alias;
+            evt.Properties["queueUrl"] = Configuration.QueueUrl;
+            evt.Properties["region"] = Configuration.Region;
+            evt.Properties["redriveUrl"] = Configuration.RedriveUrl;
+            evt.Properties["errorType"] = ex.GetType().Name;
+            evt.Properties["errorMessage"] = ex.Message;
+            evt.Exception = ex;
+
+            if (messageContent != null)
+            {
+                evt.Properties["messageContent"] = TruncateMessage(messageContent);
+            }
+
+            logger.Log(evt);
         }
     }
 }

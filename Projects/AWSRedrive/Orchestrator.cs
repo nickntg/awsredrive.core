@@ -14,13 +14,14 @@ namespace AWSRedrive
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         private readonly IConfigurationReader _configurationReader;
+        private readonly IQueueProcessorFactory _queueProcessorFactory;
         private readonly IQueueClientFactory _queueClientFactory;
         private readonly IMessageProcessorFactory _messageProcessorFactory;
-        private readonly IQueueProcessorFactory _queueProcessorFactory;
         private readonly IConfigurationChangeManager _configurationChangeManager;
         private Task _task;
         private CancellationTokenSource _cancellation;
         private List<IQueueProcessor> _processors;
+        private readonly object _lock = new();
 
         public Orchestrator(IConfigurationReader configurationReader,
             IQueueClientFactory queueClientFactory,
@@ -55,22 +56,28 @@ namespace AWSRedrive
                 {
                     try
                     {
-                        _configurationChangeManager.ReadChanges(_configurationReader, _processors, _queueClientFactory, _messageProcessorFactory, _queueProcessorFactory);
+                        lock (_lock)
+                        {
+                            _configurationChangeManager.ReadChanges(_configurationReader, _processors, _queueClientFactory, _messageProcessorFactory, _queueProcessorFactory);
+                        }
                     }
                     catch (Exception e)
                     {
                         Logger.Error(e);
                     }
-                    
+
                     lastDateTimeChecked = DateTime.Now;
                 }
 
                 Thread.Sleep(1000);
             }
 
-            foreach (var processor in _processors)
+            lock (_lock)
             {
-                processor.Stop();
+                foreach (var processor in _processors)
+                {
+                    processor.Stop();
+                }
             }
 
             Thread.Sleep(5000);
@@ -86,6 +93,32 @@ namespace AWSRedrive
             _cancellation.Dispose();
             _task.Dispose();
             IsProcessing = false;
+        }
+
+        public bool SetLogLevel(string alias, string level)
+        {
+            lock (_lock)
+            {
+                var processor = _processors.Find(p => p.Configuration.Alias == alias);
+                if (processor != null)
+                {
+                    processor.SetLogLevel(level);
+                    Logger.Info($"Set log level for {alias} to {level}");
+                    return true;
+                }
+            }
+
+            Logger.Warn($"Processor not found for alias: {alias}");
+            return false;
+        }
+
+        public string GetLogLevel(string alias)
+        {
+            lock (_lock)
+            {
+                var processor = _processors.Find(p => p.Configuration.Alias == alias);
+                return processor?.GetLogLevel();
+            }
         }
     }
 }

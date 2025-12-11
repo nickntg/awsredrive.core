@@ -2,9 +2,9 @@
 {
     public interface IOrchestrator
     {
-        bool IsProcessing { get; }
         void Start();
-        void StartProcessing();
         void Stop();
+        bool SetLogLevel(string alias, string level);
+        string GetLogLevel(string alias);
     }
 }

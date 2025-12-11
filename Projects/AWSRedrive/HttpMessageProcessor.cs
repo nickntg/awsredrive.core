@@ -5,7 +5,6 @@ using AWSRedrive.Interfaces;
 using AWSRedrive.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using NLog;
 using RestSharp;
 using RestSharp.Authenticators;
 
@@ -13,12 +12,11 @@ namespace AWSRedrive
 {
     public class HttpMessageProcessor : IMessageProcessor
     {
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly string[] _ignoredHeaders = ["content-length", "host", "accept-encoding", "content-type", "accept"];
 
-        public void ProcessMessage(string message, Dictionary<string, string> attributes, ConfigurationEntry configurationEntry)
+        public void ProcessMessage(string message, Dictionary<string, string> attributes, ConfigurationEntry configurationEntry, EntryLogger logger)
         {
-            Logger.Trace($"Preparing request to {configurationEntry.RedriveUrl}");
+            logger.Trace($"Preparing request to {configurationEntry.RedriveUrl}");
             var uri = new Uri(configurationEntry.RedriveUrl);
 
             var options = CreateOptions(uri, configurationEntry);
@@ -33,7 +31,7 @@ namespace AWSRedrive
 
             UnpackAttributesAsHeaders(message, request, configurationEntry);
 
-            SendRequest(client, request, configurationEntry);
+            SendRequest(client, request, configurationEntry, logger);
         }
 
         public void UnpackAttributesAsHeaders(string message, RestRequest request, ConfigurationEntry configurationEntry)
@@ -87,10 +85,9 @@ namespace AWSRedrive
                     request.AddQueryParameter(p.Name, p.Value.ToString());
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                Logger.Warn(ex, $"Error parsing message and adding query parameters. GET request might be incorrect.");
-                Logger.Warn($"Message was [{message}]");
+                // If parsing fails, just use the request without query parameters
             }
 
             return request;
@@ -156,18 +153,18 @@ namespace AWSRedrive
             }
         }
 
-        private void SendRequest(RestClient client, RestRequest request, ConfigurationEntry configurationEntry)
+        private void SendRequest(RestClient client, RestRequest request, ConfigurationEntry configurationEntry, EntryLogger logger)
         {
-            Logger.Trace($"Posting to {configurationEntry.RedriveUrl}");
+            logger.Trace($"Posting to {configurationEntry.RedriveUrl}");
             var response = client.ExecuteAsync(request).Result;
 
             if (response.IsSuccessful)
             {
-                Logger.Trace($"Post to {configurationEntry.RedriveUrl} successful");
+                logger.Trace($"Post to {configurationEntry.RedriveUrl} successful");
                 return;
             }
 
-            Logger.Trace($"Post to {configurationEntry.RedriveUrl} failed (status code [{response.StatusCode}], error [{response.ErrorMessage}])");
+            logger.Trace($"Post to {configurationEntry.RedriveUrl} failed (status code [{response.StatusCode}], error [{response.ErrorMessage}])");
             if (response.ErrorException != null)
             {
                 throw response.ErrorException;

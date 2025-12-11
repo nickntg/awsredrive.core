@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWSRedrive Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        xe: { orange: '#ff6b35', dark: '#1a1a2e', gray: '#f8f9fa', text: '#2d3436' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .message-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+        .message-content.expanded { max-height: 500px; }
+        pre { white-space: pre-wrap; word-wrap: break-word; }
+        .sparkline-container { width: 100%; height: 50px; }
+        .sparkline-container svg { width: 100%; height: 100%; }
+        .alias-title { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    </style>
+</head>
+<body class="bg-xe-gray dark:bg-gray-900 min-h-screen font-sans text-xe-text dark:text-gray-200 transition-colors duration-200">
+    <header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors duration-200">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <h1 class="text-xl font-bold text-xe-dark dark:text-white">📮 AWSRedrive</h1>
+                <span id="connectionStatus" class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">Connecting...</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+                    <input type="text" id="search" placeholder="Search configurations..." 
+                        class="w-64 pl-9 pr-8 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:border-xe-orange focus:ring-1 focus:ring-xe-orange">
+                    <button id="clearSearch" onclick="clearSearch()" 
+                        class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hidden">✕</button>
+                </div>
+                <button onclick="reconnect()" class="px-4 py-2 bg-xe-orange hover:bg-orange-600 text-white text-sm font-semibold rounded-lg transition">Refresh</button>
+                <button onclick="toggleDarkMode()" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition" title="Toggle dark mode">
+                    <span class="hidden dark:inline">☀️</span>
+                    <span class="inline dark:hidden">🌙</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-6">
+        <p id="resultCount" class="text-sm text-gray-500 dark:text-gray-400 mb-4"></p>
+        <div id="cards" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
+            <p class="text-center text-gray-400 col-span-full py-16">Connecting to server...</p>
+        </div>
+    </main>
+
+<script>
+let allEntries = [];
+let evtSource = null;
+let pollInterval = null;
+let reconnectAttempts = 0;
+const maxReconnectAttempts = 3;
+const reconnectDelay = 2000;
+const pollDelay = 5000;
+const expandedMessages = new Set();
+
+const metricsHistory = {};
+const maxHistoryPoints = 30;
+
+const initDarkMode = () => {
+    const stored = localStorage.getItem('darkMode');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.classList.toggle('dark', stored === 'true' || (stored === null && prefersDark));
+};
+const toggleDarkMode = () => {
+    localStorage.setItem('darkMode', document.documentElement.classList.toggle('dark'));
+};
+initDarkMode();
+
+const setStatus = (status, color) => {
+    const el = document.getElementById('connectionStatus');
+    el.textContent = status;
+    el.className = `px-2 py-1 text-xs rounded-full ${color}`;
+};
+
+const updateMetricsHistory = (entries) => {
+    entries.forEach(e => {
+        if (!e.metrics) return;
+        const alias = e.alias;
+        if (!metricsHistory[alias]) {
+            metricsHistory[alias] = { received: [], sent: [], failed: [] };
+        }
+        const h = metricsHistory[alias];
+        h.received.push(e.metrics.messagesReceived || 0);
+        h.sent.push(e.metrics.messagesSent || 0);
+        h.failed.push(e.metrics.messagesFailed || 0);
+        if (h.received.length > maxHistoryPoints) {
+            h.received.shift();
+            h.sent.shift();
+            h.failed.shift();
+        }
+    });
+};
+
+const calcDeltas = (data) => {
+    if (!data || data.length < 2) return [];
+    const deltas = [];
+    for (let i = 1; i < data.length; i++) {
+        deltas.push(Math.max(0, data[i] - data[i - 1]));
+    }
+    return deltas;
+};
+
+const combinedSparkline = (history) => {
+    const rd = calcDeltas(history.received);
+    const sd = calcDeltas(history.sent);
+    const fd = calcDeltas(history.failed);
+    
+    if (rd.length < 2) {
+        return `<svg viewBox="0 0 100 50" preserveAspectRatio="none"><text x="50" y="28" text-anchor="middle" fill="#9ca3af" font-size="8">Collecting data...</text></svg>`;
+    }
+    
+    const max = Math.max(...rd, ...sd, ...fd, 1);
+    const w = 100, h = 50, p = 2;
+    const cw = w - p * 2, ch = h - p * 2;
+    
+    const toPoints = (d) => d.length ? d.map((v, i) => `${(p + (i / (d.length - 1 || 1)) * cw).toFixed(1)},${(p + ch - (v / max) * ch).toFixed(1)}`).join(' ') : '';
+    const toArea = (d, pts) => pts ? `${p},${h - p} ${pts} ${p + cw},${h - p}` : '';
+    
+    const rp = toPoints(rd), sp = toPoints(sd), fp = toPoints(fd);
+    
+    return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+        <line x1="${p}" y1="${h - p}" x2="${w - p}" y2="${h - p}" stroke="#e5e7eb" stroke-width="0.5"/>
+        ${rp ? `<polygon points="${toArea(rd, rp)}" fill="#ff6b35" fill-opacity="0.15"/>` : ''}
+        ${sp ? `<polygon points="${toArea(sd, sp)}" fill="#22c55e" fill-opacity="0.15"/>` : ''}
+        ${fp ? `<polygon points="${toArea(fd, fp)}" fill="#ef4444" fill-opacity="0.2"/>` : ''}
+        ${rp ? `<polyline points="${rp}" fill="none" stroke="#ff6b35" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+        ${sp ? `<polyline points="${sp}" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+        ${fp ? `<polyline points="${fp}" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+    </svg>`;
+};
+
+const getAwsConsoleUrl = (queueUrl, region) => {
+    if (!queueUrl || !queueUrl.includes('sqs.')) return null;
+    const r = region || queueUrl.match(/sqs\.([a-z0-9-]+)\.amazonaws/)?.[1];
+    if (!r) return null;
+    return `https://${r}.console.aws.amazon.com/sqs/v3/home?region=${r}#/queues/${encodeURIComponent(queueUrl)}`;
+};
+
+const changeLogLevel = async (alias, level) => {
+    try {
+        const response = await fetch(`/api/loglevel/${encodeURIComponent(alias)}?level=${level}`, { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification(`Log level for "${alias}" changed to ${level}`, 'success');
+            // Update local entry
+            const entry = allEntries.find(e => e.alias === alias);
+            if (entry) entry.logLevel = level;
+            filterAndRender();
+        } else {
+            showNotification(`Failed: ${data.error}`, 'error');
+        }
+    } catch (e) {
+        showNotification(`Error: ${e.message}`, 'error');
+    }
+};
+
+const showNotification = (message, type) => {
+    const existing = document.getElementById('notification');
+    if (existing) existing.remove();
+    
+    const colors = type === 'success' 
+        ? 'bg-green-500 text-white' 
+        : 'bg-red-500 text-white';
+    
+    const div = document.createElement('div');
+    div.id = 'notification';
+    div.className = `fixed bottom-4 right-4 px-4 py-2 rounded-lg shadow-lg ${colors} transition-opacity duration-300`;
+    div.textContent = message;
+    document.body.appendChild(div);
+    
+    setTimeout(() => {
+        div.style.opacity = '0';
+        setTimeout(() => div.remove(), 300);
+    }, 3000);
+};
+
+const fetchData = async () => {
+    try {
+        const response = await fetch('/api/status');
+        if (!response.ok) throw new Error('API error');
+        const data = await response.json();
+        allEntries = data;
+        updateMetricsHistory(data);
+        filterAndRender();
+        setStatus('Connected (polling)', 'bg-green-100 text-green-700');
+        return true;
+    } catch (e) {
+        setStatus('Error', 'bg-red-100 text-red-700');
+        return false;
+    }
+};
+
+const startPolling = () => {
+    if (pollInterval) return;
+    fetchData();
+    pollInterval = setInterval(fetchData, pollDelay);
+};
+
+const stopPolling = () => {
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+};
+
+const connectSSE = () => {
+    if (evtSource) evtSource.close();
+    stopPolling();
+    setStatus('Connecting...', 'bg-yellow-100 text-yellow-700');
+    
+    try {
+        evtSource = new EventSource('/api/stream');
+        evtSource.onopen = () => { setStatus('Connected (live)', 'bg-green-100 text-green-700'); reconnectAttempts = 0; };
+        evtSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                allEntries = data;
+                updateMetricsHistory(data);
+                filterAndRender();
+            } catch (e) {}
+        };
+        evtSource.onerror = () => {
+            evtSource.close();
+            evtSource = null;
+            if (reconnectAttempts < maxReconnectAttempts) {
+                reconnectAttempts++;
+                setStatus(`Reconnecting (${reconnectAttempts}/${maxReconnectAttempts})...`, 'bg-yellow-100 text-yellow-700');
+                setTimeout(connectSSE, reconnectDelay);
+            } else {
+                startPolling();
+            }
+        };
+    } catch (e) { startPolling(); }
+};
+
+const reconnect = () => {
+    reconnectAttempts = 0;
+    stopPolling();
+    if (evtSource) { evtSource.close(); evtSource = null; }
+    connectSSE();
+};
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        if (evtSource) { evtSource.close(); evtSource = null; }
+        stopPolling();
+        setStatus('Paused', 'bg-gray-100 text-gray-600');
+    } else { reconnect(); }
+});
+
+const formatUptime = (s) => {
+    if (!s) return '-';
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+    return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m ${s % 60}s`;
+};
+
+const highlight = (text, q) => {
+    if (!q || !text) return text || '-';
+    return text.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'), '<mark class="bg-yellow-200 dark:bg-yellow-600 rounded px-0.5">$1</mark>');
+};
+
+const beautifyJson = (str) => {
+    if (!str) return '';
+    try { return JSON.stringify(JSON.parse(str), null, 2); } catch { return str; }
+};
+
+const escapeHtml = (str) => {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+};
+
+const toggleMessage = (alias) => {
+    const el = document.getElementById(`msg-${alias}`);
+    const icon = document.getElementById(`icon-${alias}`);
+    if (el) {
+        el.classList.toggle('expanded');
+        expandedMessages.has(alias) ? expandedMessages.delete(alias) : expandedMessages.add(alias);
+        icon.textContent = el.classList.contains('expanded') ? '▼' : '▶';
+    }
+};
+
+const filterAndRender = () => {
+    const q = document.getElementById('search').value.toLowerCase().trim();
+    document.getElementById('clearSearch').classList.toggle('hidden', !q);
+    const filtered = allEntries.filter(e => !q || 
+        [e.alias, e.queueUrl, e.region, e.redriveUrl, e.redriveScript, e.redriveKafkaTopic, e.logLevel, e.active ? 'active' : 'inactive']
+        .filter(Boolean).join(' ').toLowerCase().includes(q)
+    );
+    document.getElementById('resultCount').textContent = q 
+        ? `Found ${filtered.length} of ${allEntries.length} configurations` 
+        : `${allEntries.length} configurations`;
+    renderCards(filtered, q);
+};
+
+const clearSearch = () => { document.getElementById('search').value = ''; filterAndRender(); };
+
+const logLevelOptions = ['Trace', 'Debug', 'Info', 'Warn', 'Error', 'Fatal'];
+
+const renderCards = (entries, q) => {
+    const container = document.getElementById('cards');
+    
+    if (!allEntries.length) {
+        container.innerHTML = '<p class="text-center text-gray-400 col-span-full py-16">No entries configured</p>';
+        return;
+    }
+    if (!entries.length) {
+        container.innerHTML = '<p class="text-center text-gray-400 col-span-full py-16">No matching configurations</p>';
+        return;
+    }
+    
+    const h = (t) => highlight(t, q);
+    
+    container.innerHTML = entries.map(e => {
+        const m = e.metrics || {};
+        const safeAlias = (e.alias || 'unnamed').replace(/[^a-zA-Z0-9]/g, '_');
+        const isExpanded = expandedMessages.has(safeAlias);
+        const history = metricsHistory[e.alias] || { received: [], sent: [], failed: [] };
+        const awsUrl = getAwsConsoleUrl(e.queueUrl, e.region);
+        const currentLevel = e.logLevel || 'Error';
+        
+        return `
+        <div class="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition">
+            <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                <span class="font-semibold text-xe-dark dark:text-white alias-title" title="${e.alias || 'Unnamed'}">${h(e.alias) || 'Unnamed'}</span>
+                <div class="flex items-center gap-2">
+                    <span class="px-2.5 py-1 text-xs font-medium rounded-full ${e.active 
+                        ? 'bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800' 
+                        : 'bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 border border-red-200 dark:border-red-800'
+                    }">${e.active ? 'Active' : 'Inactive'}</span>
+                    ${m.uptimeSeconds ? `<span class="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">⏱ ${formatUptime(m.uptimeSeconds)}</span>` : ''}
+                </div>
+            </div>
+            
+            <div class="bg-gray-50 dark:bg-gray-800/50 px-5 py-3">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-xe-orange"></span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">Received</span>
+                            <span class="text-sm font-semibold text-xe-orange">${m.messagesReceived || 0}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">Sent</span>
+                            <span class="text-sm font-semibold text-green-500">${m.messagesSent || 0}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">Failed</span>
+                            <span class="text-sm font-semibold text-red-500">${m.messagesFailed || 0}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="sparkline-container">${combinedSparkline(history)}</div>
+            </div>
+            
+            <div class="px-5 py-4 space-y-3 text-sm">
+                <div>
+                    <div class="text-xs text-gray-400 mb-0.5">Queue URL</div>
+                    ${awsUrl 
+                        ? `<a href="${awsUrl}" target="_blank" class="text-blue-500 hover:text-blue-600 hover:underline break-all flex items-start gap-1" title="Open in AWS Console">
+                            <span>${h(e.queueUrl)}</span>
+                            <span class="text-gray-400 shrink-0">↗</span>
+                           </a>`
+                        : `<div class="text-gray-700 dark:text-gray-300 break-all">${h(e.queueUrl)}</div>`
+                    }
+                </div>
+                <div>
+                    <div class="text-xs text-gray-400 mb-0.5">Target</div>
+                    <div class="text-gray-700 dark:text-gray-300 break-all">${h(e.redriveUrl || e.redriveScript || e.redriveKafkaTopic) || '-'}</div>
+                </div>
+                <div class="flex gap-6">
+                    <div>
+                        <div class="text-xs text-gray-400 mb-0.5">Region</div>
+                        <div class="text-gray-700 dark:text-gray-300">${h(e.region) || '-'}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-0.5">Timeout</div>
+                        <div class="text-gray-700 dark:text-gray-300">${e.timeout ? e.timeout + 'ms' : 'Default'}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-0.5">Log Level</div>
+                        <select onchange="changeLogLevel('${e.alias}', this.value)" 
+                            class="text-xs bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 focus:outline-none focus:border-xe-orange cursor-pointer"
+                            ${!e.active ? 'disabled' : ''}>
+                            ${logLevelOptions.map(level => 
+                                `<option value="${level}" ${currentLevel === level ? 'selected' : ''}>${level}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+                </div>
+                
+                ${m.lastMessageContent ? `
+                <div class="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                    <button onclick="toggleMessage('${safeAlias}')" 
+                        class="w-full px-3 py-2 text-left text-xs bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2 transition">
+                        <span id="icon-${safeAlias}" class="text-gray-400">${isExpanded ? '▼' : '▶'}</span>
+                        <span class="text-gray-600 dark:text-gray-300 font-medium">📨 Last Message</span>
+                        <span class="text-gray-400 ml-auto">${m.lastMessageReceived || ''}</span>
+                    </button>
+                    <div id="msg-${safeAlias}" class="message-content ${isExpanded ? 'expanded' : ''}">
+                        <pre class="p-3 text-xs bg-gray-900 text-green-400 overflow-auto max-h-96">${escapeHtml(beautifyJson(m.lastMessageContent))}</pre>
+                    </div>
+                </div>` : ''}
+                
+                ${m.lastErrorMessage ? `
+                <div class="p-2 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-lg">
+                    <div class="text-xs text-red-400 mb-0.5">Last Error</div>
+                    <div class="text-red-600 dark:text-red-400 text-xs">${escapeHtml(m.lastErrorMessage)}</div>
+                </div>` : ''}
+            </div>
+            
+            <div class="px-5 py-3 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700 flex flex-wrap gap-1.5">
+                ${e.useGET ? '<span class="px-2 py-0.5 text-xs bg-xe-orange/10 dark:bg-xe-orange/20 text-xe-orange rounded font-medium">GET</span>' : ''}
+                ${e.usePUT ? '<span class="px-2 py-0.5 text-xs bg-xe-orange/10 dark:bg-xe-orange/20 text-xe-orange rounded font-medium">PUT</span>' : ''}
+                ${e.useDelete ? '<span class="px-2 py-0.5 text-xs bg-xe-orange/10 dark:bg-xe-orange/20 text-xe-orange rounded font-medium">DELETE</span>' : ''}
+                ${!e.useGET && !e.usePUT && !e.useDelete ? '<span class="px-2 py-0.5 text-xs bg-xe-orange/10 dark:bg-xe-orange/20 text-xe-orange rounded font-medium">POST</span>' : ''}
+                ${e.hasAccessKey ? '<span class="px-2 py-0.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded font-medium">AWS Key</span>' : ''}
+                ${e.hasAuthToken ? '<span class="px-2 py-0.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded font-medium">Auth</span>' : ''}
+                ${e.hasBasicAuth ? '<span class="px-2 py-0.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded font-medium">Basic Auth</span>' : ''}
+                ${e.hasAwsGatewayToken ? '<span class="px-2 py-0.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded font-medium">API Key</span>' : ''}
+            </div>
+            
+            <div class="px-5 py-2.5 text-xs text-gray-400 border-t border-gray-100 dark:border-gray-700 space-y-0.5">
+                ${m.startedAt ? `<div>🚀 Started: ${m.startedAt}</div>` : ''}
+                ${m.lastMessageReceived ? `<div>📥 Last received: ${m.lastMessageReceived}</div>` : ''}
+                ${m.lastMessageSent ? `<div>📤 Last sent: ${m.lastMessageSent}</div>` : ''}
+                ${m.lastError ? `<div>⚠️ Last error: ${m.lastError}</div>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+};
+
+document.getElementById('search').addEventListener('input', filterAndRender);
+document.getElementById('search').addEventListener('keydown', e => e.key === 'Escape' && clearSearch());
+
+fetchData().then(() => setTimeout(connectSSE, 1000));
+</script>
+</body>
+</html>

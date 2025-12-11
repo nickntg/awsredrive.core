@@ -4,22 +4,17 @@ using System.Management.Automation;
 using System.Text;
 using AWSRedrive.Interfaces;
 using AWSRedrive.Models;
-using NLog;
 
 namespace AWSRedrive
 {
     public class PowerShellMessageProcessor : IMessageProcessor
     {
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-
-        public void ProcessMessage(string message, Dictionary<string, string> attributes, ConfigurationEntry configurationEntry)
+        public void ProcessMessage(string message, Dictionary<string, string> attributes, ConfigurationEntry configurationEntry, EntryLogger logger)
         {
             using (var ps = PowerShell.Create())
             {
                 var script = File.ReadAllText(configurationEntry.RedriveScript);
 
-                // We expect that not-throwing an exception signifies a successful execution.
-                // For debugging purposes, we'll assemble and show the output.
                 var results = ps.AddScript(script).AddParameter("content", message).Invoke();
 
                 var sb = new StringBuilder();
@@ -31,11 +26,11 @@ namespace AWSRedrive
                 var logString = sb.ToString();
                 if (!string.IsNullOrEmpty(logString))
                 {
-                    Logger.Debug($"Script output: {logString}");
+                    logger.Debug($"Script output: {logString}");
                 }
                 else
                 {
-                    Logger.Debug("No script output was produced");
+                    logger.Debug("No script output was produced");
                 }
             }
         }

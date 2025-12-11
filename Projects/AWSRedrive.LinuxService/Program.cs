@@ -1,11 +1,15 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using AWSRedrive;
 using AWSRedrive.DI;
+using AWSRedrive.Interfaces;
+using AWSRedrive.Models;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using NLog;
-using NLog.Extensions.Logging;
+using NLog.Web;
 
 namespace AWSRedrive.LinuxService
 {
@@ -15,15 +19,30 @@ namespace AWSRedrive.LinuxService
         {
             SetCurrentDirectoryForService();
 
+            var configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
+                .Build();
+
+            var appSettings = new AppSettings();
+            configuration.Bind(appSettings);
+
             var host = Host.CreateDefaultBuilder(args)
+                .UseNLog()
                 .ConfigureServices(services =>
                 {
-                    Injector.Inject(services);
-                    services.AddHostedService<Worker>();
-                    services.AddLogging(builder =>
+                    Injector.Inject(services, appSettings);
+
+                    services.AddSingleton(appSettings);
+
+                    services.AddSingleton<DashboardServer>(sp =>
                     {
-                        builder.AddNLog();
+                        var configReader = sp.GetRequiredService<IConfigurationReader>();
+                        var orchestrator = sp.GetRequiredService<IOrchestrator>();
+                        return new DashboardServer(configReader, orchestrator, appSettings.Dashboard);
                     });
+
+                    services.AddHostedService<Worker>();
                 })
                 .Build();
 
