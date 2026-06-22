@@ -40,6 +40,10 @@ namespace AWSRedrive.console
 
             var orchestrator = Injector.Container.GetRequiredService<IOrchestrator>();
 
+            // Start orchestrator first so _processors is initialized before dashboard accepts requests
+            orchestrator.Start();
+            Logger.Info("Orchestrator started");
+
             DashboardServer dashboard = null;
             if (appSettings.Dashboard.Enabled)
             {
@@ -48,9 +52,6 @@ namespace AWSRedrive.console
                 dashboard.Start();
                 Logger.Info($"Dashboard running at http://localhost:{appSettings.Dashboard.Port}");
             }
-
-            orchestrator.Start();
-            Logger.Info("Orchestrator started");
 
             Console.CancelKeyPress += (s, e) =>
             {

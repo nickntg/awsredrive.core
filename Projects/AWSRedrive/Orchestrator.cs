@@ -99,7 +99,10 @@ namespace AWSRedrive
         {
             lock (_lock)
             {
-                var processor = _processors.Find(p => p.Configuration.Alias == alias);
+                if (_processors == null)
+                    return false;
+
+                var processor = _processors.Find(p => p.Configuration?.Alias == alias);
                 if (processor != null)
                 {
                     processor.SetLogLevel(level);
@@ -116,7 +119,10 @@ namespace AWSRedrive
         {
             lock (_lock)
             {
-                var processor = _processors.Find(p => p.Configuration.Alias == alias);
+                if (_processors == null)
+                    return null;
+
+                var processor = _processors.Find(p => p.Configuration?.Alias == alias);
                 return processor?.GetLogLevel();
             }
         }

@@ -32,6 +32,11 @@ namespace AWSRedrive.LinuxService
                 _logger.Info($"Metrics.Enabled: {_appSettings.Metrics.Enabled}");
                 _logger.Info($"Metrics.IntervalSeconds: {_appSettings.Metrics.IntervalSeconds}");
 
+                // Start orchestrator first so _processors is initialized before dashboard accepts requests
+                _logger.Info("Starting orchestrator");
+                _orchestrator.Start();
+                _logger.Info("Orchestrator started");
+
                 if (_appSettings.Dashboard.Enabled)
                 {
                     _logger.Info($"Starting dashboard server on port {_appSettings.Dashboard.Port}");
@@ -42,10 +47,6 @@ namespace AWSRedrive.LinuxService
                 {
                     _logger.Info("Dashboard is disabled");
                 }
-
-                _logger.Info("Starting orchestrator");
-                _orchestrator.Start();
-                _logger.Info("Orchestrator started");
 
                 while (!stoppingToken.IsCancellationRequested)
                 {
