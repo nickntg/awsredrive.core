@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,7 +15,7 @@ namespace AWSRedrive
     {
         public ConfigurationEntry ConfigurationEntry { get; set; }
 
-        private IAmazonSQS _client;
+        protected IAmazonSQS _client;
 
         public void Init()
         {
@@ -74,15 +75,21 @@ namespace AWSRedrive
                     var response = await _client.ReceiveMessageAsync(request, source.Token);
                     if (response?.Messages?.Count >= 1)
                     {
-                        var attributes = response.Messages[0].MessageAttributes
-                            .ToDictionary(item => item.Key, item => item.Value.StringValue);
+                        var message = response.Messages[0];
+                        
+                        var attributes = message.MessageAttributes?
+                            .ToDictionary(item => item.Key, item => item.Value.StringValue)
+                            ?? new Dictionary<string, string>();
 
-                        foreach (var item in response.Messages[0].Attributes)
+                        if (message.Attributes != null)
                         {
-                            attributes.Add(item.Key, item.Value);
+                            foreach (var item in message.Attributes)
+                            {
+                                attributes.Add(item.Key, item.Value);
+                            }
                         }
 
-                        return new SqsMessage(response.Messages[0].ReceiptHandle, response.Messages[0].Body, attributes);
+                        return new SqsMessage(message.ReceiptHandle, message.Body, attributes);
                     }
 
                     return null;
