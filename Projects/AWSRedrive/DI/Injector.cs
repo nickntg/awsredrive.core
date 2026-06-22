@@ -35,7 +35,7 @@ namespace AWSRedrive.DI
             services.AddSingleton<IMessageProcessorFactory, MessageProcessorFactory>();
             services.AddTransient<IQueueProcessorFactory, QueueProcessorFactory>();
             services.AddTransient<IConfigurationChangeManager, ConfigurationChangeManager>();
-            services.AddTransient<IOrchestrator, Orchestrator>();
+            services.AddSingleton<IOrchestrator, Orchestrator>();
         }
 
         protected Injector() { }
