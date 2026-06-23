@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 using AWSRedrive.Interfaces;
 using AWSRedrive.Models;
-using Newtonsoft.Json;
 using NLog;
 
 namespace AWSRedrive
@@ -65,11 +64,11 @@ namespace AWSRedrive
                     continue;
                 }
 
-                var processorConfig = JsonConvert.SerializeObject(config);
                 var found = false;
                 foreach (var processor in processors)
                 {
-                    found = JsonConvert.SerializeObject(processor.Configuration) == processorConfig;
+                    // Compare by Alias only - allows runtime changes (e.g., LogLevel) to persist
+                    found = processor.Configuration?.Alias == config.Alias;
 
                     if (found)
                     {
@@ -97,11 +96,11 @@ namespace AWSRedrive
             var toRemove = new List<IQueueProcessor>();
             foreach (var processor in processors)
             {
-                var processorConfig = JsonConvert.SerializeObject(processor.Configuration);
                 var found = false;
                 foreach (var config in configurations)
                 {
-                    found = JsonConvert.SerializeObject(config) == processorConfig;
+                    // Compare by Alias only - processor stays if alias exists and is active
+                    found = config.Alias == processor.Configuration?.Alias && config.Active;
                     if (found)
                     {
                         break;
