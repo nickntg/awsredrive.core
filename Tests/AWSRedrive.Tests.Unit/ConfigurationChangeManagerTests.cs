@@ -252,13 +252,42 @@ namespace AWSRedrive.Tests.Unit
             Assert.NotNull(processors);
             Assert.Equal(3, processors.Count);
 
-            var count = 4;
+            // Verify no processor was stopped or started - just configuration was checked
             foreach (var processor in mockedProcessors)
             {
                 A.CallTo(() => processor.Configuration)
-                    .MustHaveHappened(count, Times.Exactly);
-                count--;
+                    .MustHaveHappenedOnceOrMore();
             }
+        }
+
+        [Fact]
+        public void DoesNotRestartProcessorWhenOnlyLogLevelChanges()
+        {
+            var configChangeManager = new ConfigurationChangeManager();
+            
+            var originalConfig = GetOneConfigurationEntry("#1", true);
+            originalConfig.LogLevel = "Error";
+            
+            var changedConfig = GetOneConfigurationEntry("#1", true);
+            changedConfig.LogLevel = "Debug"; // Only LogLevel changed
+
+            var config = new SimpleConfigurationReader
+            {
+                Configs = new List<ConfigurationEntry> { changedConfig }
+            };
+
+            var mockProcessor = A.Fake<IQueueProcessor>(x => x.Strict());
+            A.CallTo(() => mockProcessor.Configuration)
+                .Returns(originalConfig);
+            // Note: No Stop() setup - test will fail if Stop() is called
+
+            var processors = new List<IQueueProcessor> { mockProcessor };
+
+            configChangeManager.ReadChanges(config, processors, null, null, null);
+            
+            Assert.Single(processors);
+            A.CallTo(() => mockProcessor.Configuration)
+                .MustHaveHappenedOnceOrMore();
         }
 
         private static ConfigurationEntry GetOneConfigurationEntry(string alias, bool active)

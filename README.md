@@ -10,17 +10,17 @@ Configuration is stored in config.json and is periodically read by AWSRedrive, t
 
 Here's a sample configuration entry for reading a queue and posting the messages found there to an endpoint:
 
-```js
-  {
-    "Alias": "#1",
-    "QueueUrl": "https://sqs.eu-west-1.amazonaws.com/accountid/inputqueue1",
-    "RedriveUrl": "http://nohost.com/",
-    "Region": "eu-west-1",
-    "Active": true,
-    "Timeout": 10000,
-    "LogLevel": "Error",
-    "ServiceUrl": "https://www.google.com" 
-  }
+```json
+{
+  "Alias": "#1",
+  "QueueUrl": "https://sqs.eu-west-1.amazonaws.com/accountid/inputqueue1",
+  "RedriveUrl": "http://nohost.com/",
+  "Region": "eu-west-1",
+  "Active": true,
+  "Timeout": 10000,
+  "LogLevel": "Info",
+  "ServiceUrl": "https://www.google.com" 
+}
 ```
 
 Here are the elements of a configuration entry:
@@ -48,7 +48,7 @@ Here are the elements of a configuration entry:
 * **IgnoreCertificateErrors**. If set to True, AWSRedrive will ignore any certificate errors when connecting to the configured service endpoint.
 * **UnpackAttributesAsHeaders**. If set to True, AWSRedrive will try to treat the incoming message as being an [SNS envelope](https://docs.aws.amazon.com/sns/latest/dg/sns-message-and-json-formats.html), then unpack message attributes and transfer them as HTTP headers.
 * **ServiceUrl**. If configured, this value will be passed to the ServiceURL property of the AWS SDK. This is useful when working with [LocalStack](https://localstack.cloud/) instead of AWS.
-* **LogLevel**. The log level for this entry (Trace, Debug, Info, Warn, Error, Fatal). Defaults to Error. Can be changed at runtime via the dashboard or API.
+* **LogLevel**. The log level for this entry (Trace, Debug, Info, Warn, Error, Fatal). If not specified, uses the global `DefaultLogLevel` from appsettings.json.
 
 ## Application Settings
 
@@ -56,11 +56,13 @@ Application-wide settings are stored in appsettings.json:
 
 ```json
 {
+  "DefaultLogLevel": "Error",
   "Dashboard": { "Enabled": true, "Port": 5000, "RefreshIntervalMs": 1000 },
   "Metrics": { "Enabled": true, "IntervalSeconds": 60 }
 }
 ```
 
+* **DefaultLogLevel**. Default log level for aliases without explicit LogLevel (default: Error).
 * **Dashboard.Enabled**. Enables the web dashboard.
 * **Dashboard.Port**. Dashboard port (default: 5000).
 * **Dashboard.RefreshIntervalMs**. Dashboard refresh interval (default: 1000ms).
@@ -69,56 +71,85 @@ Application-wide settings are stored in appsettings.json:
 
 ## Dashboard
 
-AWSRedrive includes a web dashboard for real-time monitoring at `http://localhost:5000`. It provides status of all queue processors, message counts with sparkline graphs, error information, and runtime log level changes. Log levels can also be changed via API:
+AWSRedrive includes a web dashboard for real-time monitoring at `http://localhost:5000`. Features:
+
+- Status overview of all queue processors
+- Message counts with sparkline graphs
+- Summary bar with totals and error count
+- Sorting by name, received, failed, uptime, or recent activity
+- Error highlighting with red cards
+- Runtime log level changes (temporary, reverts after 30 minutes)
+- Direct links to AWS SQS Console
+
+Log levels can also be changed via API:
 
 ```bash
 curl -X POST "http://localhost:5000/api/loglevel/MyAlias?level=Debug"
 ```
 
+**Note:** Log level changes from dashboard/API are temporary and revert after 30 minutes or on app restart. For permanent changes, edit config.json.
+
 ## Logging
 
-AWSRedrive uses structured JSON logging to console and file (`logs/awsredrive.json`):
+AWSRedrive uses structured JSON logging to file (`logs/awsredrive.log`):
 
 ```json
 {"@timestamp":"2024-01-15T10:30:45.123Z","level":"INFO","logger":"QueueProcessor","message":"Message received","alias":"MyAlias"}
 ```
 
+Log files are archived daily with date suffix (e.g., `awsredrive.2024-01-14.log`) and kept for 7 days.
+
 ## Building
 
-AWSRedrive uses a Makefile. Prerequisites: .NET 8 SDK, optionally Docker.
+Prerequisites: .NET 8 SDK or Docker.
 
 ```bash
-make help             # Show all commands
-
-# Development
-make run              # Run locally
-make watch            # Run with hot reload
-make test             # Run tests
-
-# Build
-make console          # Build console app
-make service          # Build Linux service
-make all              # Build both
-make console-quick    # Build without tests
-
-# Cross-platform (auto-detected if not specified)
-make console RUNTIME=linux-x64
-make console RUNTIME=linux-arm64
-make console RUNTIME=osx-arm64
-make console RUNTIME=win-x64
-
-# Docker
-make docker-console   # Export binary via Docker
-make image            # Build container image
-make image-run        # Run container locally
-make image-push DOCKER_REGISTRY=ghcr.io/user DOCKER_TAG=1.0.0
-
-# macOS signing
-make sign
-
-# Cleanup
-make clean
+make help    # Show all available commands
 ```
+
+### Development
+
+```bash
+make run     # Run console app locally
+make watch   # Run with hot reload
+make test    # Run unit tests
+```
+
+### Build with Local .NET SDK
+
+```bash
+make all                       # Build console + service (runs tests first)
+make all-quick                 # Build without tests
+make console RUNTIME=linux-x64 # Cross-compile for specific runtime
+```
+
+### Build with Docker SDK (no local .NET required)
+
+Ideal for building Linux binaries from Mac/Windows:
+
+```bash
+make docker-build-all          # Test + build console + service for linux-x64
+make docker-build-all-quick    # Build without tests
+make docker-test               # Run tests in Docker
+```
+
+Output: `./publish/service-linux-x64/` and `./publish/console-linux-x64/`
+
+### Docker Image
+
+```bash
+make image                     # Build container image
+make image-run                 # Run container locally
+make image-push DOCKER_REGISTRY=ghcr.io/user DOCKER_TAG=1.0.0
+```
+
+### Options
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RUNTIME` | auto-detected | Target runtime (linux-x64, linux-arm64, osx-arm64, win-x64) |
+| `BUILD_RUNTIME` | linux-x64 | Target for docker-build-* commands |
+| `CONFIG` | Release | Build configuration |
 
 ## Running with Docker
 
@@ -132,7 +163,7 @@ docker run --rm -it \
 
 ## Running as a Linux Service
 
-Build with `make service RUNTIME=linux-x64`, then create `/etc/systemd/system/awsredrive.service`:
+Build with `make docker-build-service` or `make service RUNTIME=linux-x64`, then create `/etc/systemd/system/awsredrive.service`:
 
 ```ini
 [Unit]

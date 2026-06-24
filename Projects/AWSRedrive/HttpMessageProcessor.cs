@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using AWSRedrive.Interfaces;
 using AWSRedrive.Models;
@@ -16,20 +17,29 @@ namespace AWSRedrive
 
         public void ProcessMessage(string message, Dictionary<string, string> attributes, ConfigurationEntry configurationEntry, EntryLogger logger)
         {
-            logger.Trace($"Preparing request to {configurationEntry.RedriveUrl}");
             var uri = new Uri(configurationEntry.RedriveUrl);
+            var method = configurationEntry.UseGET ? "GET" : configurationEntry.UsePUT ? "PUT" : configurationEntry.UseDelete ? "DELETE" : "POST";
+            
+            logger.Debug($"Preparing {method} request to {uri.Host}{uri.PathAndQuery}");
+            logger.Trace($"Request options: timeout={configurationEntry.Timeout}ms, ignoreCertErrors={configurationEntry.IgnoreCertificateErrors}");
 
             var options = CreateOptions(uri, configurationEntry);
-
             var client = new RestClient(options);
-
             var request = CreateRequest(message, uri, configurationEntry);
 
             AddAuthentication(client, request, configurationEntry);
+            if (!string.IsNullOrEmpty(configurationEntry.AwsGatewayToken))
+                logger.Trace("Added x-api-key header");
+            if (!string.IsNullOrEmpty(configurationEntry.AuthToken))
+                logger.Trace("Added Authorization header");
 
             AddAttributes(request, attributes);
+            if (attributes?.Count > 0)
+                logger.Trace($"Added {attributes.Count} message attributes as headers");
 
             UnpackAttributesAsHeaders(message, request, configurationEntry);
+
+            logger.Trace($"Request body: {message?.Length ?? 0} chars");
 
             SendRequest(client, request, configurationEntry, logger);
         }
@@ -155,16 +165,34 @@ namespace AWSRedrive
 
         private void SendRequest(RestClient client, RestRequest request, ConfigurationEntry configurationEntry, EntryLogger logger)
         {
-            logger.Trace($"Posting to {configurationEntry.RedriveUrl}");
+            var stopwatch = Stopwatch.StartNew();
             var response = client.ExecuteAsync(request).Result;
+            stopwatch.Stop();
+
+            var elapsed = stopwatch.ElapsedMilliseconds;
 
             if (response.IsSuccessful)
             {
-                logger.Trace($"Post to {configurationEntry.RedriveUrl} successful");
+                logger.Debug($"Response: {(int)response.StatusCode} {response.StatusCode} ({elapsed}ms)");
+                if (logger.IsTraceEnabled && !string.IsNullOrEmpty(response.Content))
+                {
+                    var preview = response.Content.Length > 500 
+                        ? response.Content.Substring(0, 500) + "..." 
+                        : response.Content;
+                    logger.Trace($"Response body: {preview}");
+                }
                 return;
             }
 
-            logger.Trace($"Post to {configurationEntry.RedriveUrl} failed (status code [{response.StatusCode}], error [{response.ErrorMessage}])");
+            logger.Debug($"Request failed: {(int)response.StatusCode} {response.StatusCode} ({elapsed}ms)");
+            if (logger.IsTraceEnabled && !string.IsNullOrEmpty(response.Content))
+            {
+                var preview = response.Content.Length > 500 
+                    ? response.Content.Substring(0, 500) + "..." 
+                    : response.Content;
+                logger.Trace($"Error response: {preview}");
+            }
+
             if (response.ErrorException != null)
             {
                 throw response.ErrorException;

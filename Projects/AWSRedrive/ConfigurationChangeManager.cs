@@ -25,15 +25,15 @@ namespace AWSRedrive
                 queueClientFactory, 
                 messageProcessorFactory,
                 queueProcessorFactory);
-
+ 
             /*
              * Second, find processors to remove.
-             */
+            */
             var toRemove = FindEntriesToRemove(configurations, processors);
-
+ 
             /*
              * Now remove those for removal and add the new ones.
-             */
+            */
 
             foreach (var processor in toRemove)
             {
@@ -48,6 +48,41 @@ namespace AWSRedrive
                 processor.Start();
                 processors.Add(processor);
             }
+        }
+
+        /// <summary>
+        /// Compares configurations excluding LogLevel (can be changed at runtime via dashboard).
+        /// Changes to LogLevel persist until app restart.
+        /// </summary>
+        private bool ConfigurationsMatch(ConfigurationEntry a, ConfigurationEntry b)
+        {
+            if (a == null || b == null) return false;
+            
+            return a.Alias == b.Alias &&
+                   a.Active == b.Active &&
+                   a.Profile == b.Profile &&
+                   a.AccessKey == b.AccessKey &&
+                   a.SecretKey == b.SecretKey &&
+                   a.QueueUrl == b.QueueUrl &&
+                   a.Region == b.Region &&
+                   a.RedriveUrl == b.RedriveUrl &&
+                   a.RedriveScript == b.RedriveScript &&
+                   a.RedriveKafkaTopic == b.RedriveKafkaTopic &&
+                   a.KafkaBootstrapServers == b.KafkaBootstrapServers &&
+                   a.KafkaClientId == b.KafkaClientId &&
+                   a.UseKafkaCompression == b.UseKafkaCompression &&
+                   a.AwsGatewayToken == b.AwsGatewayToken &&
+                   a.AuthToken == b.AuthToken &&
+                   a.BasicAuthUserName == b.BasicAuthUserName &&
+                   a.BasicAuthPassword == b.BasicAuthPassword &&
+                   a.UsePUT == b.UsePUT &&
+                   a.UseGET == b.UseGET &&
+                   a.UseDelete == b.UseDelete &&
+                   a.Timeout == b.Timeout &&
+                   a.IgnoreCertificateErrors == b.IgnoreCertificateErrors &&
+                   a.UnpackAttributesAsHeaders == b.UnpackAttributesAsHeaders &&
+                   a.ServiceUrl == b.ServiceUrl;
+            // LogLevel intentionally excluded - runtime changes persist until restart
         }
 
         private List<IQueueProcessor> FindConfigsToAdd(List<ConfigurationEntry> configurations, 
@@ -67,13 +102,8 @@ namespace AWSRedrive
                 var found = false;
                 foreach (var processor in processors)
                 {
-                    // Compare by Alias only - allows runtime changes (e.g., LogLevel) to persist
-                    found = processor.Configuration?.Alias == config.Alias;
-
-                    if (found)
-                    {
-                        break;
-                    }
+                    found = ConfigurationsMatch(processor.Configuration, config);
+                    if (found) break;
                 }
 
                 if (!found)
@@ -99,12 +129,8 @@ namespace AWSRedrive
                 var found = false;
                 foreach (var config in configurations)
                 {
-                    // Compare by Alias only - processor stays if alias exists and is active
-                    found = config.Alias == processor.Configuration?.Alias && config.Active;
-                    if (found)
-                    {
-                        break;
-                    }
+                    found = ConfigurationsMatch(config, processor.Configuration);
+                    if (found) break;
                 }
 
                 if (!found)

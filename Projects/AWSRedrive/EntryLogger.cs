@@ -9,14 +9,28 @@ namespace AWSRedrive
     {
         private volatile LogLevel _minLevel;
         private readonly string _alias;
+        private readonly string _messageId;
 
-        public EntryLogger(string alias, string logLevel)
+        public EntryLogger(string alias, string logLevel) : this(alias, logLevel, null)
+        {
+        }
+
+        public EntryLogger(string alias, string logLevel, string messageId)
         {
             _alias = alias;
+            _messageId = messageId;
             _minLevel = ParseLogLevel(logLevel);
         }
 
         public string CurrentLogLevel => _minLevel.Name;
+
+        /// <summary>
+        /// Creates a new logger with message context for correlation
+        /// </summary>
+        public EntryLogger WithMessageId(string messageId)
+        {
+            return new EntryLogger(_alias, _minLevel.Name, messageId);
+        }
 
         public void SetLogLevel(string level)
         {
@@ -55,6 +69,10 @@ namespace AWSRedrive
             var logger = LogManager.GetLogger(loggerName);
             var evt = new LogEventInfo(level, loggerName, message);
             evt.Properties["alias"] = _alias;
+            if (!string.IsNullOrEmpty(_messageId))
+            {
+                evt.Properties["messageId"] = _messageId;
+            }
             if (ex != null) evt.Exception = ex;
             logger.Log(evt);
         }

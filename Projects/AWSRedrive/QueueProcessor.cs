@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AWSRedrive.Interfaces;
@@ -10,10 +11,12 @@ namespace AWSRedrive
     public class QueueProcessor : IQueueProcessor
     {
         private const int MaxMessageContentSize = 100 * 1024; // 100KB
+        private static readonly TimeSpan LogLevelTimeout = TimeSpan.FromMinutes(30);
 
         public ConfigurationEntry Configuration { get; set; }
 
         private readonly IMetricsSettings _metricsSettings;
+        private readonly string _defaultLogLevel;
         private readonly Logger _metricsLogger;
         private readonly Logger _entryLogger;
 
@@ -25,14 +28,19 @@ namespace AWSRedrive
         private QueueMetrics _metrics;
         private DateTime _lastMetricsLog;
 
-        public QueueProcessor(IMetricsSettings metricsSettings)
+        // Time-limited log level tracking
+        private DateTime? _logLevelChangedAt;
+        private string _originalLogLevel;
+
+        public QueueProcessor(IMetricsSettings metricsSettings, string defaultLogLevel = "Error")
         {
             _metricsSettings = metricsSettings ?? new MetricsSettingsProvider(null);
+            _defaultLogLevel = defaultLogLevel ?? "Error";
             _metricsLogger = LogManager.GetLogger("Metrics");
             _entryLogger = LogManager.GetLogger("Entry");
         }
 
-        public QueueProcessor() : this(null) { }
+        public QueueProcessor() : this(null, "Error") { }
 
         public void Init(IQueueClient queueClient, 
             IMessageProcessorFactory messageProcessorFactory, 
@@ -41,16 +49,25 @@ namespace AWSRedrive
             Configuration = configuration;
             _queueClient = queueClient;
             _messageProcessorFactory = messageProcessorFactory;
-            _logger = new EntryLogger(configuration.Alias, configuration.LogLevel);
+            
+            var effectiveLogLevel = configuration.LogLevel ?? _defaultLogLevel;
+            _logger = new EntryLogger(configuration.Alias, effectiveLogLevel);
+            _originalLogLevel = effectiveLogLevel;
+            
             _metrics = MetricsStore.GetOrCreate(configuration.Alias);
             _lastMetricsLog = DateTime.UtcNow;
         }
 
         public void SetLogLevel(string level)
         {
+            if (_logLevelChangedAt == null)
+            {
+                _originalLogLevel = _logger.CurrentLogLevel;
+            }
+            _logLevelChangedAt = DateTime.UtcNow;
             _logger.SetLogLevel(level);
             Configuration.LogLevel = level;
-            _logger.Info($"Log level changed to {level}");
+            _logger.Info($"Log level changed to {level} (reverts in 30 min)");
         }
 
         public string GetLogLevel()
@@ -111,6 +128,7 @@ namespace AWSRedrive
         {
             while (!_cancellation.IsCancellationRequested)
             {
+                CheckLogLevelExpiry();
                 CheckPeriodicMetrics();
 
                 IMessage msg;
@@ -137,18 +155,26 @@ namespace AWSRedrive
                 _metrics.LastMessageReceived = DateTime.UtcNow;
                 _metrics.LastMessageContent = TruncateMessage(msg.Content);
 
-                _logger.Debug("Message received");
+                _logger.Debug($"Message received [id={msg.MessageIdentifier}]");
                 if (_logger.IsTraceEnabled)
                 {
-                    _logger.Trace($"Content: {msg.Content}");
+                    _logger.Trace($"Message content ({msg.Content?.Length ?? 0} chars): {msg.Content}");
+                    if (msg.Attributes?.Count > 0)
+                    {
+                        _logger.Trace($"Message attributes: {string.Join(", ", msg.Attributes.Select(a => $"{a.Key}={a.Value}"))}");
+                    }
                 }
 
                 try
                 {
-                    _logger.Debug($"Processing to {Configuration.RedriveUrl}");
+                    var target = Configuration.RedriveUrl ?? Configuration.RedriveScript ?? Configuration.RedriveKafkaTopic ?? "unknown";
+                    _logger.Debug($"Processing message [id={msg.MessageIdentifier}] to {target}");
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
                     var processor = _messageProcessorFactory.CreateMessageProcessor(Configuration);
-                    processor.ProcessMessage(msg.Content, msg.Attributes, Configuration, _logger);
-                    _logger.Debug("Processed");
+                    var scopedLogger = _logger.WithMessageId(msg.MessageIdentifier);
+                    processor.ProcessMessage(msg.Content, msg.Attributes, Configuration, scopedLogger);
+                    sw.Stop();
+                    _logger.Debug($"Processed [id={msg.MessageIdentifier}] in {sw.ElapsedMilliseconds}ms");
 
                     _metrics.MessagesSent++;
                     _metrics.LastMessageSent = DateTime.UtcNow;
@@ -161,7 +187,7 @@ namespace AWSRedrive
                     }
                     catch (Exception e)
                     {
-                        LogError($"Delete failed [{msg.MessageIdentifier}]", e);
+                        LogError($"Delete failed", e, msg.MessageIdentifier);
                         _metrics.LastError = DateTime.UtcNow;
                         _metrics.LastErrorMessage = e.Message;
                     }
@@ -172,8 +198,20 @@ namespace AWSRedrive
                     _metrics.LastError = DateTime.UtcNow;
                     _metrics.LastErrorMessage = e.Message;
 
-                    LogError($"Process failed [{msg.MessageIdentifier}]", e, msg.Content);
+                    LogError($"Process failed", e, msg.MessageIdentifier, msg.Content);
                 }
+            }
+        }
+
+        private void CheckLogLevelExpiry()
+        {
+            if (_logLevelChangedAt.HasValue &&
+                DateTime.UtcNow - _logLevelChangedAt.Value > LogLevelTimeout)
+            {
+                _logger.SetLogLevel(_originalLogLevel);
+                Configuration.LogLevel = _originalLogLevel;
+                _logger.Info($"Log level reverted to {_originalLogLevel} after timeout");
+                _logLevelChangedAt = null;
             }
         }
 
@@ -219,7 +257,7 @@ namespace AWSRedrive
             _metricsLogger.Log(evt);
         }
 
-        private void LogError(string message, Exception ex, string messageContent = null)
+        private void LogError(string message, Exception ex, string messageId = null, string messageContent = null)
         {
             var loggerName = "QueueProcessor";
             var logger = LogManager.GetLogger(loggerName);
@@ -231,6 +269,10 @@ namespace AWSRedrive
             evt.Properties["redriveUrl"] = Configuration.RedriveUrl;
             evt.Properties["errorType"] = ex.GetType().Name;
             evt.Properties["errorMessage"] = ex.Message;
+            if (!string.IsNullOrEmpty(messageId))
+            {
+                evt.Properties["messageId"] = messageId;
+            }
             evt.Exception = ex;
 
             if (messageContent != null)

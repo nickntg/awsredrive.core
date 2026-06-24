@@ -4,6 +4,7 @@ namespace AWSRedrive.Models
     {
         public DashboardSettings Dashboard { get; set; } = new DashboardSettings();
         public MetricsSettings Metrics { get; set; } = new MetricsSettings();
+        public string DefaultLogLevel { get; set; } = "Error";
     }
 
     public class DashboardSettings

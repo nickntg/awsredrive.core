@@ -170,24 +170,6 @@ const getAwsConsoleUrl = (queueUrl, region) => {
     return `https://${r}.console.aws.amazon.com/sqs/v3/home?region=${r}#/queues/${encodeURIComponent(queueUrl)}`;
 };
 
-const changeLogLevel = async (alias, level) => {
-    try {
-        const response = await fetch(`/api/loglevel/${encodeURIComponent(alias)}?level=${level}`, { method: 'POST' });
-        const data = await response.json();
-        
-        if (data.success) {
-            showNotification(`Log level for "${alias}" changed to ${level}`, 'success');
-            const entry = allEntries.find(e => e.alias === alias);
-            if (entry) entry.logLevel = level;
-            filterAndRender();
-        } else {
-            showNotification(`Failed: ${data.error}`, 'error');
-        }
-    } catch (e) {
-        showNotification(`Error: ${e.message}`, 'error');
-    }
-};
-
 const showNotification = (message, type) => {
     const existing = document.getElementById('notification');
     if (existing) existing.remove();
@@ -376,6 +358,24 @@ const clearSearch = () => { document.getElementById('search').value = ''; filter
 
 const logLevelOptions = ['Trace', 'Debug', 'Info', 'Warn', 'Error', 'Fatal'];
 
+const changeLogLevel = async (alias, level) => {
+    try {
+        const response = await fetch(`/api/loglevel/${encodeURIComponent(alias)}?level=${level}`, { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification(`Log level for "${alias}" → ${level} (reverts in 30 min)`, 'success');
+            const entry = allEntries.find(e => e.alias === alias);
+            if (entry) entry.logLevel = level;
+            filterAndRender();
+        } else {
+            showNotification(`Failed: ${data.error}`, 'error');
+        }
+    } catch (e) {
+        showNotification(`Error: ${e.message}`, 'error');
+    }
+};
+
 const renderCards = (entries, q) => {
     const container = document.getElementById('cards');
     
@@ -460,7 +460,7 @@ const renderCards = (entries, q) => {
                         <div class="text-gray-700 dark:text-gray-300">${e.timeout ? e.timeout + 'ms' : 'Default'}</div>
                     </div>
                     <div>
-                        <div class="text-xs text-gray-400 mb-0.5">Log Level</div>
+                        <div class="text-xs text-gray-400 mb-0.5">Log Level <span class="text-yellow-500 cursor-help" title="Changes revert after 30 min or on restart/deployment">ⓘ</span></div>
                         <select onchange="changeLogLevel('${e.alias}', this.value)" 
                             class="text-xs bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 focus:outline-none focus:border-xe-orange cursor-pointer"
                             ${!e.active ? 'disabled' : ''}>
