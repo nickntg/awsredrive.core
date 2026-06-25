@@ -94,10 +94,44 @@ curl -X POST "http://localhost:5000/api/loglevel/MyAlias?level=Debug"
 AWSRedrive uses structured JSON logging to file (`logs/awsredrive.log`):
 
 ```json
-{"@timestamp":"2024-01-15T10:30:45.123Z","level":"INFO","logger":"QueueProcessor","message":"Message received","alias":"MyAlias"}
+{"@timestamp":"2024-01-15T10:30:45.123Z","level":"DEBUG","alias":"Orders","messageId":"a1b2c3d4-e5f6-7890","message":"Message received"}
 ```
 
 Log files are archived daily with date suffix (e.g., `awsredrive.2024-01-14.log`) and kept for 7 days.
+
+### Log Levels
+
+| Level | What's Logged |
+|-------|---------------|
+| **Error** | Process/delete failures with `messageId`, `messageContent`, `messageAttributes`, exception details |
+| **Warn** | Non-graceful stops, warnings |
+| **Info** | Processor start/stop, log level changes, metrics |
+| **Debug** | Message received/processed/deleted with timing, response status, attributes |
+| **Trace** | Message content, request/response bodies, detailed config |
+
+### Message Correlation
+
+Every message-related log includes `messageId` (the SQS Message ID) as a searchable field. Use it to:
+- Correlate with producer logs (producer receives MessageId from `SendMessageResponse`)
+- Find failed messages in DLQ via AWS Console
+- Track a message through the entire processing pipeline
+
+### Error Log Example
+
+```json
+{
+  "@timestamp": "2024-01-15T10:30:45.123Z",
+  "level": "ERROR",
+  "alias": "Orders",
+  "messageId": "a1b2c3d4-e5f6-7890",
+  "messageContent": "{\"orderId\":123}",
+  "messageAttributes": "correlation-id=xyz, source=orders-api",
+  "errorType": "HttpRequestException",
+  "errorMessage": "Connection refused",
+  "queueUrl": "https://sqs.../orders-queue",
+  "redriveUrl": "https://api.example.com/webhook"
+}
+```
 
 ## Building
 

@@ -22,6 +22,7 @@ namespace AWSRedrive.Tests.Unit
                 {
                     new Message
                     {
+                        MessageId = "test-message-id",
                         ReceiptHandle = "test-handle",
                         Body = "test-body",
                         MessageAttributes = null, // SDK 4.x can return null
@@ -49,7 +50,8 @@ namespace AWSRedrive.Tests.Unit
 
             // Assert
             Assert.NotNull(message);
-            Assert.Equal("test-handle", message.MessageIdentifier);
+            Assert.Equal("test-message-id", message.MessageId);
+            Assert.Equal("test-handle", message.ReceiptHandle);
             Assert.Equal("test-body", message.Content);
             Assert.NotNull(message.Attributes);
             Assert.Empty(message.Attributes);
@@ -66,6 +68,7 @@ namespace AWSRedrive.Tests.Unit
                 {
                     new Message
                     {
+                        MessageId = "test-message-id",
                         ReceiptHandle = "test-handle",
                         Body = "test-body",
                         MessageAttributes = new Dictionary<string, MessageAttributeValue>(),
@@ -108,6 +111,7 @@ namespace AWSRedrive.Tests.Unit
                 {
                     new Message
                     {
+                        MessageId = "test-message-id",
                         ReceiptHandle = "test-handle",
                         Body = "test-body",
                         MessageAttributes = new Dictionary<string, MessageAttributeValue>
@@ -141,6 +145,7 @@ namespace AWSRedrive.Tests.Unit
 
             // Assert
             Assert.NotNull(message);
+            Assert.Equal("test-message-id", message.MessageId);
             Assert.Equal(2, message.Attributes.Count);
             Assert.Equal("customValue", message.Attributes["customAttr"]);
             Assert.Equal("1234567890", message.Attributes["SentTimestamp"]);
@@ -157,6 +162,7 @@ namespace AWSRedrive.Tests.Unit
                 {
                     new Message
                     {
+                        MessageId = "test-message-id",
                         ReceiptHandle = "test-handle",
                         Body = "test-body",
                         MessageAttributes = null, // SDK 4.x can return null

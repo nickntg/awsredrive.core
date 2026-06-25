@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -83,6 +84,7 @@ namespace AWSRedrive
                 return;
             }
 
+            _logger.Info($"Starting processor for queue {Configuration.QueueUrl}");
             _metrics.StartedAt = DateTime.UtcNow;
             _cancellation = new CancellationTokenSource();
             _task = new Task(ProcessMessageLoop, _cancellation.Token, TaskCreationOptions.LongRunning);
@@ -102,6 +104,8 @@ namespace AWSRedrive
                 return;
             }
 
+            _logger.Info($"Stopping processor for queue {Configuration.QueueUrl}");
+
             try
             {
                 _cancellation.Cancel();
@@ -111,7 +115,7 @@ namespace AWSRedrive
             }
             catch (Exception e)
             {
-                _logger.Warn($"Not stopped gracefully - {e}");
+                _logger.Warn($"Not stopped gracefully - {e.Message}");
             }
             finally
             {
@@ -126,6 +130,8 @@ namespace AWSRedrive
 
         public void ProcessMessageLoop()
         {
+            _logger.Debug("Entering message loop");
+            
             while (!_cancellation.IsCancellationRequested)
             {
                 CheckLogLevelExpiry();
@@ -135,17 +141,17 @@ namespace AWSRedrive
 
                 try
                 {
-                    _logger.Debug("Waiting for message");
+                    _logger.Trace("Polling for message...");
                     msg = _queueClient.GetMessage();
                     if (msg == null)
                     {
-                        _logger.Debug("No message");
+                        _logger.Trace("No message received (timeout)");
                         continue;
                     }
                 }
                 catch (Exception e)
                 {
-                    LogError("Queue error", e);
+                    LogError("Queue receive error", e);
                     _metrics.LastError = DateTime.UtcNow;
                     _metrics.LastErrorMessage = e.Message;
                     continue;
@@ -155,39 +161,47 @@ namespace AWSRedrive
                 _metrics.LastMessageReceived = DateTime.UtcNow;
                 _metrics.LastMessageContent = TruncateMessage(msg.Content);
 
-                _logger.Debug($"Message received [id={msg.MessageIdentifier}]");
-                if (_logger.IsTraceEnabled)
+                // Use scoped logger with messageId for all message-related logs
+                var msgLogger = _logger.WithMessageId(msg.MessageId);
+                
+                msgLogger.Debug("Message received");
+                
+                // Log attributes at Debug level
+                if (msg.Attributes?.Count > 0)
                 {
-                    _logger.Trace($"Message content ({msg.Content?.Length ?? 0} chars): {msg.Content}");
-                    if (msg.Attributes?.Count > 0)
-                    {
-                        _logger.Trace($"Message attributes: {string.Join(", ", msg.Attributes.Select(a => $"{a.Key}={a.Value}"))}");
-                    }
+                    msgLogger.Debug($"Attributes ({msg.Attributes.Count}): {string.Join(", ", msg.Attributes.Select(a => $"{a.Key}={TruncateForLog(a.Value, 100)}"))}");
+                }
+                
+                // Log content at Trace level
+                if (msgLogger.IsTraceEnabled)
+                {
+                    msgLogger.Trace($"Content ({msg.Content?.Length ?? 0} chars): {TruncateForLog(msg.Content, 1000)}");
                 }
 
                 try
                 {
                     var target = Configuration.RedriveUrl ?? Configuration.RedriveScript ?? Configuration.RedriveKafkaTopic ?? "unknown";
-                    _logger.Debug($"Processing message [id={msg.MessageIdentifier}] to {target}");
+                    msgLogger.Debug($"Processing to {target}");
+                    
                     var sw = System.Diagnostics.Stopwatch.StartNew();
                     var processor = _messageProcessorFactory.CreateMessageProcessor(Configuration);
-                    var scopedLogger = _logger.WithMessageId(msg.MessageIdentifier);
-                    processor.ProcessMessage(msg.Content, msg.Attributes, Configuration, scopedLogger);
+                    processor.ProcessMessage(msg.Content, msg.Attributes, Configuration, msgLogger);
                     sw.Stop();
-                    _logger.Debug($"Processed [id={msg.MessageIdentifier}] in {sw.ElapsedMilliseconds}ms");
+                    
+                    msgLogger.Debug($"Processed successfully in {sw.ElapsedMilliseconds}ms");
 
                     _metrics.MessagesSent++;
                     _metrics.LastMessageSent = DateTime.UtcNow;
 
                     try
                     {
-                        _logger.Debug($"Deleting [{msg.MessageIdentifier}]");
+                        msgLogger.Trace("Deleting from queue");
                         _queueClient.DeleteMessage(msg);
-                        _logger.Debug("Deleted");
+                        msgLogger.Debug("Deleted");
                     }
                     catch (Exception e)
                     {
-                        LogError($"Delete failed", e, msg.MessageIdentifier);
+                        LogError("Delete failed", e, msg.MessageId, null, msg.Attributes);
                         _metrics.LastError = DateTime.UtcNow;
                         _metrics.LastErrorMessage = e.Message;
                     }
@@ -198,9 +212,11 @@ namespace AWSRedrive
                     _metrics.LastError = DateTime.UtcNow;
                     _metrics.LastErrorMessage = e.Message;
 
-                    LogError($"Process failed", e, msg.MessageIdentifier, msg.Content);
+                    LogError("Process failed", e, msg.MessageId, msg.Content, msg.Attributes);
                 }
             }
+            
+            _logger.Debug("Exiting message loop");
         }
 
         private void CheckLogLevelExpiry()
@@ -208,9 +224,9 @@ namespace AWSRedrive
             if (_logLevelChangedAt.HasValue &&
                 DateTime.UtcNow - _logLevelChangedAt.Value > LogLevelTimeout)
             {
+                _logger.Info($"Log level reverting to {_originalLogLevel} after timeout");
                 _logger.SetLogLevel(_originalLogLevel);
                 Configuration.LogLevel = _originalLogLevel;
-                _logger.Info($"Log level reverted to {_originalLogLevel} after timeout");
                 _logLevelChangedAt = null;
             }
         }
@@ -224,6 +240,17 @@ namespace AWSRedrive
                 return content;
 
             return content.Substring(0, MaxMessageContentSize) + $"... [truncated, original size: {content.Length:N0} bytes]";
+        }
+
+        private static string TruncateForLog(string content, int maxLength)
+        {
+            if (string.IsNullOrEmpty(content))
+                return "(empty)";
+
+            if (content.Length <= maxLength)
+                return content;
+
+            return content.Substring(0, maxLength) + "...";
         }
 
         private void CheckPeriodicMetrics()
@@ -257,7 +284,7 @@ namespace AWSRedrive
             _metricsLogger.Log(evt);
         }
 
-        private void LogError(string message, Exception ex, string messageId = null, string messageContent = null)
+        private void LogError(string message, Exception ex, string messageId = null, string messageContent = null, Dictionary<string, string> attributes = null)
         {
             var loggerName = "QueueProcessor";
             var logger = LogManager.GetLogger(loggerName);
@@ -278,6 +305,11 @@ namespace AWSRedrive
             if (messageContent != null)
             {
                 evt.Properties["messageContent"] = TruncateMessage(messageContent);
+            }
+
+            if (attributes != null && attributes.Count > 0)
+            {
+                evt.Properties["messageAttributes"] = string.Join(", ", attributes.Select(a => $"{a.Key}={TruncateForLog(a.Value, 100)}"));
             }
 
             logger.Log(evt);

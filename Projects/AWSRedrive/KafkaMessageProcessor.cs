@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using AWSRedrive.Interfaces;
 using AWSRedrive.Models;
@@ -11,6 +12,11 @@ namespace AWSRedrive
     {
         public void ProcessMessage(string message, Dictionary<string, string> attributes, ConfigurationEntry configurationEntry, EntryLogger logger)
         {
+            var topic = configurationEntry.RedriveKafkaTopic;
+            var timeout = configurationEntry.Timeout ?? 1000;
+            
+            logger.Debug($"Preparing Kafka produce to topic {topic}");
+            
             var config = new ProducerConfig
             {
                 BootstrapServers = configurationEntry.KafkaBootstrapServers,
@@ -23,32 +29,46 @@ namespace AWSRedrive
             if (configurationEntry.UseKafkaCompression)
             {
                 config.CompressionType = CompressionType.Snappy;
+                logger.Trace("Compression: Snappy");
             }
 
-            logger.Trace($"Creating producer for kafka topic {configurationEntry.RedriveKafkaTopic}");
+            logger.Trace($"BootstrapServers: {configurationEntry.KafkaBootstrapServers}, ClientId: {config.ClientId}, Timeout: {timeout}ms");
+            logger.Trace($"Message size: {message?.Length ?? 0} chars");
+
             using (var producer = new ProducerBuilder<Null, string>(config).Build())
             {
                 var ct = new CancellationTokenSource();
-                ct.CancelAfter(configurationEntry.Timeout ?? 1000);
+                ct.CancelAfter(timeout);
+                
+                var stopwatch = Stopwatch.StartNew();
                 try
                 {
-                    logger.Trace($"Posting to kafka topic {configurationEntry.RedriveKafkaTopic}");
-                    var result = producer.ProduceAsync(configurationEntry.RedriveKafkaTopic,
+                    var result = producer.ProduceAsync(topic,
                         new Message<Null, string> { Value = message }, ct.Token).Result;
+                    stopwatch.Stop();
+                    
                     if (result.Status == PersistenceStatus.Persisted)
                     {
-                        logger.Trace($"Post to kafka topic {configurationEntry.RedriveKafkaTopic} successful");
+                        logger.Debug($"Kafka produce successful ({stopwatch.ElapsedMilliseconds}ms) - Partition: {result.Partition.Value}, Offset: {result.Offset.Value}");
+                        logger.Trace($"Topic: {result.Topic}, Timestamp: {result.Timestamp.UtcDateTime:O}");
                     }
                     else
                     {
-                        logger.Trace($"Post to kafka topic {configurationEntry.RedriveKafkaTopic} failed, status={result.Status}");
+                        logger.Debug($"Kafka produce failed ({stopwatch.ElapsedMilliseconds}ms) - Status: {result.Status}");
                         throw new InvalidOperationException(
-                            $"Post to kafka topic {configurationEntry.RedriveKafkaTopic} failed, status={result.Status}");
+                            $"Kafka produce to topic {topic} failed, status={result.Status}");
                     }
                 }
-                catch (Exception ex)
+                catch (OperationCanceledException)
                 {
-                    logger.Error(ex, $"Error while posting to kafka topic {configurationEntry.RedriveKafkaTopic}");
+                    stopwatch.Stop();
+                    logger.Debug($"Kafka produce timeout after {stopwatch.ElapsedMilliseconds}ms");
+                    throw new TimeoutException($"Kafka produce to topic {topic} timed out after {timeout}ms");
+                }
+                catch (ProduceException<Null, string> ex)
+                {
+                    stopwatch.Stop();
+                    logger.Debug($"Kafka produce error ({stopwatch.ElapsedMilliseconds}ms) - {ex.Error.Code}: {ex.Error.Reason}");
                     throw;
                 }
             }

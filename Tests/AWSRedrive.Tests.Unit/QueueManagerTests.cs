@@ -14,7 +14,7 @@ namespace AWSRedrive.Tests.Unit
         [Fact]
         public void ProcessMessage_Successful_DeletesMessage()
         {
-            var testMessage = new TestMessage("handle", "content");
+            var testMessage = new TestMessage("msg-123", "handle", "content");
             var callCount = 0;
 
             var queueClientMock = A.Fake<IQueueClient>();
@@ -66,7 +66,7 @@ namespace AWSRedrive.Tests.Unit
         [Fact]
         public void ProcessMessage_Failed_DoesNotDeleteMessage()
         {
-            var testMessage = new TestMessage("handle", "content");
+            var testMessage = new TestMessage("msg-123", "handle", "content");
             var callCount = 0;
 
             var queueClientMock = A.Fake<IQueueClient>();
@@ -112,7 +112,7 @@ namespace AWSRedrive.Tests.Unit
         [Fact]
         public void ProcessMessage_UpdatesMetrics()
         {
-            var testMessage = new TestMessage("handle", "content");
+            var testMessage = new TestMessage("msg-123", "handle", "content");
             var callCount = 0;
 
             var queueClientMock = A.Fake<IQueueClient>();
@@ -165,7 +165,7 @@ namespace AWSRedrive.Tests.Unit
         [Fact]
         public void ProcessMessage_Failed_UpdatesFailedMetrics()
         {
-            var testMessage = new TestMessage("handle", "content");
+            var testMessage = new TestMessage("msg-123", "handle", "content");
             var callCount = 0;
 
             var queueClientMock = A.Fake<IQueueClient>();
@@ -216,14 +216,16 @@ namespace AWSRedrive.Tests.Unit
 
         private class TestMessage : IMessage
         {
-            public TestMessage(string handle, string content)
+            public TestMessage(string messageId, string receiptHandle, string content)
             {
-                MessageIdentifier = handle;
+                MessageId = messageId;
+                ReceiptHandle = receiptHandle;
                 Content = content;
                 Attributes = new Dictionary<string, string>();
             }
 
-            public string MessageIdentifier { get; }
+            public string MessageId { get; }
+            public string ReceiptHandle { get; }
             public string Content { get; }
             public Dictionary<string, string> Attributes { get; }
         }

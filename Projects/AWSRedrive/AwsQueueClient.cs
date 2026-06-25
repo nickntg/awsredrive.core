@@ -89,7 +89,7 @@ namespace AWSRedrive
                             }
                         }
 
-                        return new SqsMessage(message.ReceiptHandle, message.Body, attributes);
+                        return new SqsMessage(message.MessageId, message.ReceiptHandle, message.Body, attributes);
                     }
 
                     return null;
@@ -116,7 +116,7 @@ namespace AWSRedrive
             var request = new DeleteMessageRequest
             {
                 QueueUrl = ConfigurationEntry.QueueUrl,
-                ReceiptHandle = message.MessageIdentifier
+                ReceiptHandle = message.ReceiptHandle
             };
 
             using (var source = new CancellationTokenSource(20 * 1000))

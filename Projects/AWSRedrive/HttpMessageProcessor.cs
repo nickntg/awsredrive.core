@@ -21,30 +21,22 @@ namespace AWSRedrive
             var method = configurationEntry.UseGET ? "GET" : configurationEntry.UsePUT ? "PUT" : configurationEntry.UseDelete ? "DELETE" : "POST";
             
             logger.Debug($"Preparing {method} request to {uri.Host}{uri.PathAndQuery}");
-            logger.Trace($"Request options: timeout={configurationEntry.Timeout}ms, ignoreCertErrors={configurationEntry.IgnoreCertificateErrors}");
+            logger.Trace($"Timeout: {configurationEntry.Timeout}ms, IgnoreCertErrors: {configurationEntry.IgnoreCertificateErrors}");
 
             var options = CreateOptions(uri, configurationEntry);
             var client = new RestClient(options);
             var request = CreateRequest(message, uri, configurationEntry);
 
-            AddAuthentication(client, request, configurationEntry);
-            if (!string.IsNullOrEmpty(configurationEntry.AwsGatewayToken))
-                logger.Trace("Added x-api-key header");
-            if (!string.IsNullOrEmpty(configurationEntry.AuthToken))
-                logger.Trace("Added Authorization header");
-
-            AddAttributes(request, attributes);
-            if (attributes?.Count > 0)
-                logger.Trace($"Added {attributes.Count} message attributes as headers");
-
-            UnpackAttributesAsHeaders(message, request, configurationEntry);
+            AddAuthentication(client, request, configurationEntry, logger);
+            AddAttributes(request, attributes, logger);
+            UnpackAttributesAsHeaders(message, request, configurationEntry, logger);
 
             logger.Trace($"Request body: {message?.Length ?? 0} chars");
 
             SendRequest(client, request, configurationEntry, logger);
         }
 
-        public void UnpackAttributesAsHeaders(string message, RestRequest request, ConfigurationEntry configurationEntry)
+        public void UnpackAttributesAsHeaders(string message, RestRequest request, ConfigurationEntry configurationEntry, EntryLogger logger)
         {
             if (!configurationEntry.UnpackAttributesAsHeaders)
             {
@@ -59,6 +51,7 @@ namespace AWSRedrive
                     return;
                 }
 
+                var count = 0;
                 foreach (var attribute in snsEnvelope.MessageAttributes)
                 {
                     var value = attribute.Value.Value.ToString();
@@ -67,13 +60,19 @@ namespace AWSRedrive
                         if (!_ignoredHeaders.Contains(attribute.Key.ToLower()))
                         {
                             request.AddHeader(attribute.Key, value);
+                            count++;
                         }
                     }
+                }
+                
+                if (count > 0)
+                {
+                    logger.Trace($"Unpacked {count} SNS message attributes as headers");
                 }
             }
             catch
             {
-                // Ignored.
+                // Ignored - not an SNS envelope
             }
         }
 
@@ -136,30 +135,46 @@ namespace AWSRedrive
             return options;
         }
 
-        public void AddAuthentication(RestClient client, RestRequest request, ConfigurationEntry configurationEntry)
+        public void AddAuthentication(RestClient client, RestRequest request, ConfigurationEntry configurationEntry, EntryLogger logger)
         {
             if (!string.IsNullOrEmpty(configurationEntry.AwsGatewayToken))
             {
                 request.AddHeader("x-api-key", configurationEntry.AwsGatewayToken);
+                logger.Trace("Added x-api-key header");
             }
 
             if (!string.IsNullOrEmpty(configurationEntry.AuthToken))
             {
                 request.AddHeader("Authorization", configurationEntry.AuthToken);
+                logger.Trace("Added Authorization header");
+            }
+
+            if (!string.IsNullOrEmpty(configurationEntry.BasicAuthUserName))
+            {
+                logger.Trace("Using Basic authentication");
             }
         }
 
-        public void AddAttributes(RestRequest request, Dictionary<string, string> attributes)
+        public void AddAttributes(RestRequest request, Dictionary<string, string> attributes, EntryLogger logger)
         {
-            if (attributes != null)
+            if (attributes == null || attributes.Count == 0)
             {
-                foreach (var key in attributes.Keys.Where(key => !string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(attributes[key])))
+                return;
+            }
+
+            var count = 0;
+            foreach (var key in attributes.Keys.Where(key => !string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(attributes[key])))
+            {
+                if (!_ignoredHeaders.Contains(key.ToLower()))
                 {
-                    if (!_ignoredHeaders.Contains(key.ToLower()))
-                    {
-                        request.AddHeader(key, attributes[key]);
-                    }
+                    request.AddHeader(key, attributes[key]);
+                    count++;
                 }
+            }
+
+            if (count > 0)
+            {
+                logger.Trace($"Added {count} message attributes as headers");
             }
         }
 
@@ -179,7 +194,7 @@ namespace AWSRedrive
                     var preview = response.Content.Length > 500 
                         ? response.Content.Substring(0, 500) + "..." 
                         : response.Content;
-                    logger.Trace($"Response body: {preview}");
+                    logger.Trace($"Response body ({response.Content.Length} chars): {preview}");
                 }
                 return;
             }
@@ -190,7 +205,7 @@ namespace AWSRedrive
                 var preview = response.Content.Length > 500 
                     ? response.Content.Substring(0, 500) + "..." 
                     : response.Content;
-                logger.Trace($"Error response: {preview}");
+                logger.Trace($"Error response ({response.Content.Length} chars): {preview}");
             }
 
             if (response.ErrorException != null)
