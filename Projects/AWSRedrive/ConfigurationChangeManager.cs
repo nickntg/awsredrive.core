@@ -18,13 +18,23 @@ namespace AWSRedrive
         {
             var configurations = configurationReader.ReadConfiguration();
 
+            /*
+             * First, create processors to add.
+            */
             var toAdd = FindConfigsToAdd(configurations, 
                 processors, 
                 queueClientFactory, 
                 messageProcessorFactory,
                 queueProcessorFactory);
 
+            /*
+             * Second, find processors to remove.
+             */
             var toRemove = FindEntriesToRemove(configurations, processors);
+
+            /*
+             * Now remove those for removal and add the new ones.
+             */
 
             foreach (var processor in toRemove)
             {
