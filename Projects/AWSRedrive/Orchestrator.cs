@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AWSRedrive.Interfaces;
+using AWSRedrive.Models;
 using NLog;
 
 namespace AWSRedrive
@@ -124,6 +126,20 @@ namespace AWSRedrive
 
                 var processor = _processors.Find(p => p.Configuration?.Alias == alias);
                 return processor?.GetLogLevel();
+            }
+        }
+
+        public List<ConfigurationEntry> GetConfigurations()
+        {
+            lock (_lock)
+            {
+                if (_processors == null)
+                    return new List<ConfigurationEntry>();
+
+                return _processors
+                    .Where(p => p.Configuration != null)
+                    .Select(p => p.Configuration)
+                    .ToList();
             }
         }
     }

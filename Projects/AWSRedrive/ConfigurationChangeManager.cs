@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using AWSRedrive.Interfaces;
 using AWSRedrive.Models;
 using NLog;
@@ -17,23 +18,13 @@ namespace AWSRedrive
         {
             var configurations = configurationReader.ReadConfiguration();
 
-            /*
-             * First, create processors to add.
-            */
             var toAdd = FindConfigsToAdd(configurations, 
                 processors, 
                 queueClientFactory, 
                 messageProcessorFactory,
                 queueProcessorFactory);
- 
-            /*
-             * Second, find processors to remove.
-            */
+
             var toRemove = FindEntriesToRemove(configurations, processors);
- 
-            /*
-             * Now remove those for removal and add the new ones.
-            */
 
             foreach (var processor in toRemove)
             {
@@ -111,6 +102,21 @@ namespace AWSRedrive
                     Logger.Debug($"Creating new queueprocessor for queue [{config.QueueUrl}], url [{config.RedriveUrl}], alias [{config.Alias}]");
                     var queueClient = queueClientFactory.CreateClient(config);
                     queueClient.Init();
+                    
+                    // Fetch DLQ URL from SQS RedrivePolicy
+                    try
+                    {
+                        config.DlqUrl = queueClient.GetDlqUrl();
+                        if (!string.IsNullOrEmpty(config.DlqUrl))
+                        {
+                            Logger.Debug($"DLQ for [{config.Alias}]: {config.DlqUrl}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn($"Could not fetch DLQ for [{config.Alias}]: {ex.Message}");
+                    }
+                    
                     var queueProcessor = queueProcessorFactory.CreateQueueProcessor();
                     queueProcessor.Init(queueClient, messageProcessorFactory, config);
                     toAdd.Add(queueProcessor);

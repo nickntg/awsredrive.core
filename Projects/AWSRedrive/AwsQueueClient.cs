@@ -125,6 +125,64 @@ namespace AWSRedrive
             }
         }
 
+        public string GetDlqUrl()
+        {
+            try
+            {
+                return GetDlqUrlAsync().Result;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private async Task<string> GetDlqUrlAsync()
+        {
+            var request = new GetQueueAttributesRequest
+            {
+                QueueUrl = ConfigurationEntry.QueueUrl,
+                AttributeNames = new List<string> { "RedrivePolicy" }
+            };
+
+            using (var source = new CancellationTokenSource(10 * 1000))
+            {
+                var response = await _client.GetQueueAttributesAsync(request, source.Token);
+                
+                if (response.Attributes == null || 
+                    !response.Attributes.TryGetValue("RedrivePolicy", out var policy) ||
+                    string.IsNullOrEmpty(policy))
+                {
+                    return null;
+                }
+
+                // Parse RedrivePolicy JSON: {"deadLetterTargetArn":"arn:aws:sqs:region:account:queue-dlq","maxReceiveCount":3}
+                var match = System.Text.RegularExpressions.Regex.Match(
+                    policy, 
+                    @"""deadLetterTargetArn""\s*:\s*""([^""]+)""");
+                
+                if (!match.Success) return null;
+
+                var arn = match.Groups[1].Value;
+                // ARN format: arn:aws:sqs:region:account:queue-name
+                var parts = arn.Split(':');
+                if (parts.Length < 6) return null;
+
+                var region = parts[3];
+                var account = parts[4];
+                var queueName = parts[5];
+
+                // Build queue URL
+                if (!string.IsNullOrEmpty(ConfigurationEntry.ServiceUrl))
+                {
+                    // LocalStack or custom endpoint
+                    return $"{ConfigurationEntry.ServiceUrl}/{account}/{queueName}";
+                }
+                
+                return $"https://sqs.{region}.amazonaws.com/{account}/{queueName}";
+            }
+        }
+
         public void Dispose()
         {
             Dispose(true);

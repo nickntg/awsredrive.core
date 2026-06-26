@@ -205,11 +205,20 @@ namespace AWSRedrive
 
         private List<object> GetStatus()
         {
-            var configs = _configReader.ReadConfiguration();
+            // Get all configurations from config reader (includes inactive)
+            var allConfigs = _configReader.ReadConfiguration();
+            
+            // Get runtime configurations from orchestrator (has DlqUrl for active ones)
+            var runtimeConfigs = _orchestrator?.GetConfigurations() ?? new List<ConfigurationEntry>();
+            var runtimeByAlias = runtimeConfigs.ToDictionary(c => c.Alias, c => c);
+            
             var result = new List<object>();
 
-            foreach (var config in configs)
+            foreach (var config in allConfigs)
             {
+                // Use runtime config if available (has DlqUrl), otherwise use file config
+                var effectiveConfig = runtimeByAlias.TryGetValue(config.Alias, out var runtime) ? runtime : config;
+                
                 var metrics = MetricsStore.GetOrCreate(config.Alias);
                 var currentLogLevel = _orchestrator?.GetLogLevel(config.Alias) ?? config.LogLevel ?? "Error";
                 var uptimeSeconds = metrics.StartedAt == default
@@ -224,6 +233,8 @@ namespace AWSRedrive
                     config.RedriveUrl,
                     config.RedriveScript,
                     config.RedriveKafkaTopic,
+                    config.KafkaBootstrapServers,
+                    DlqUrl = effectiveConfig.DlqUrl,
                     config.Active,
                     config.Timeout,
                     LogLevel = currentLogLevel,

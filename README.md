@@ -71,23 +71,47 @@ Application-wide settings are stored in appsettings.json:
 
 ## Dashboard
 
-AWSRedrive includes a web dashboard for real-time monitoring at `http://localhost:5000`. Features:
+AWSRedrive includes a web dashboard for real-time monitoring at `http://localhost:5000`.
 
-- Status overview of all queue processors
-- Message counts with sparkline graphs
-- Summary bar with totals and error count
-- Sorting by name, received, failed, uptime, or recent activity
-- Error highlighting with red cards
-- Runtime log level changes (temporary, reverts after 30 minutes)
-- Direct links to AWS SQS Console
+### Views
 
-Log levels can also be changed via API:
+| View | Icon | Description |
+|------|------|-------------|
+| **Cards** | ▦ | Full details with sparklines (default) |
+| **Table** | ☰ | Compact sortable table |
+| **Compact** | ≡ | Minimal one-line rows |
+
+### Features
+
+- **Grouping:** None, Type (HTTP/Kafka/PowerShell), Status, Target Host
+- **Sorting:** Name, Type, Host, Received, Failed, Uptime, Recent Activity
+- **Refresh:** 1 min / 5 min (default) / 10 min / Manual
+- **Live Mode:** 5-second refresh, auto-stops after 5 minutes
+- **DLQ Link:** Auto-detected from SQS RedrivePolicy, links to AWS Console
+- **Log Level:** Runtime changes (revert after 30 min)
+- **Settings:** Persisted to browser localStorage
+
+### API
 
 ```bash
+# Change log level (temporary)
 curl -X POST "http://localhost:5000/api/loglevel/MyAlias?level=Debug"
+
+# Get current status
+curl http://localhost:5000/api/status
 ```
 
-**Note:** Log level changes from dashboard/API are temporary and revert after 30 minutes or on app restart. For permanent changes, edit config.json.
+### IAM Permissions
+
+The dashboard requires `sqs:GetQueueAttributes` to auto-detect DLQ URLs:
+
+```json
+{
+  "Effect": "Allow",
+  "Action": "sqs:GetQueueAttributes",
+  "Resource": "*"
+}
+```
 
 ## Logging
 

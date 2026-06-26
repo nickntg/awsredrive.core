@@ -80,6 +80,8 @@ namespace AWSRedrive.Tests.Unit
             var mockClient = A.Fake<IQueueClient>(x => x.Strict());
             A.CallTo(() => mockClient.Init())
                 .DoesNothing();
+            A.CallTo(() => mockClient.GetDlqUrl())
+                .Returns(null);
 
             var mockClientFactory = A.Fake<IQueueClientFactory>(x => x.Strict());
             A.CallTo(() => mockClientFactory.CreateClient(A<ConfigurationEntry>.Ignored))
@@ -181,6 +183,8 @@ namespace AWSRedrive.Tests.Unit
             var mockClient = A.Fake<IQueueClient>(x => x.Strict());
             A.CallTo(() => mockClient.Init())
                 .DoesNothing();
+            A.CallTo(() => mockClient.GetDlqUrl())
+                .Returns(null);
 
             var mockClientFactory = A.Fake<IQueueClientFactory>(x => x.Strict());
             A.CallTo(() => mockClientFactory.CreateClient(A<ConfigurationEntry>.Ignored))
