@@ -110,6 +110,9 @@ namespace AWSRedrive
                 return Results.Json(status, JsonOptions);
             });
 
+            _app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+            _app.MapGet("/api/health", () => Results.Ok(new { status = "healthy" }));
+
             _app.MapGet("/api/stream", async (HttpContext ctx, CancellationToken ct) =>
             {
                 ctx.Response.Headers.ContentType = "text/event-stream";
