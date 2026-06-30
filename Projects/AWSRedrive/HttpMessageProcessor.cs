@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using AWSRedrive.Interfaces;
 using AWSRedrive.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using NLog;
 using RestSharp;
 using RestSharp.Authenticators;
 
@@ -13,30 +13,30 @@ namespace AWSRedrive
 {
     public class HttpMessageProcessor : IMessageProcessor
     {
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly string[] _ignoredHeaders = ["content-length", "host", "accept-encoding", "content-type", "accept"];
 
-        public void ProcessMessage(string message, Dictionary<string, string> attributes, ConfigurationEntry configurationEntry)
+        public void ProcessMessage(string message, Dictionary<string, string> attributes, ConfigurationEntry configurationEntry, EntryLogger logger)
         {
-            Logger.Trace($"Preparing request to {configurationEntry.RedriveUrl}");
             var uri = new Uri(configurationEntry.RedriveUrl);
+            var method = configurationEntry.UseGET ? "GET" : configurationEntry.UsePUT ? "PUT" : configurationEntry.UseDelete ? "DELETE" : "POST";
+            
+            logger.Debug($"Preparing {method} request to {uri.Host}{uri.PathAndQuery}");
+            logger.Trace($"Timeout: {configurationEntry.Timeout}ms, IgnoreCertErrors: {configurationEntry.IgnoreCertificateErrors}");
 
             var options = CreateOptions(uri, configurationEntry);
-
             var client = new RestClient(options);
-
             var request = CreateRequest(message, uri, configurationEntry);
 
-            AddAuthentication(client, request, configurationEntry);
+            AddAuthentication(client, request, configurationEntry, logger);
+            AddAttributes(request, attributes, logger);
+            UnpackAttributesAsHeaders(message, request, configurationEntry, logger);
 
-            AddAttributes(request, attributes);
+            logger.Trace($"Request body: {message?.Length ?? 0} chars");
 
-            UnpackAttributesAsHeaders(message, request, configurationEntry);
-
-            SendRequest(client, request, configurationEntry);
+            SendRequest(client, request, configurationEntry, logger);
         }
 
-        public void UnpackAttributesAsHeaders(string message, RestRequest request, ConfigurationEntry configurationEntry)
+        public void UnpackAttributesAsHeaders(string message, RestRequest request, ConfigurationEntry configurationEntry, EntryLogger logger)
         {
             if (!configurationEntry.UnpackAttributesAsHeaders)
             {
@@ -51,6 +51,7 @@ namespace AWSRedrive
                     return;
                 }
 
+                var count = 0;
                 foreach (var attribute in snsEnvelope.MessageAttributes)
                 {
                     var value = attribute.Value.Value.ToString();
@@ -59,13 +60,19 @@ namespace AWSRedrive
                         if (!_ignoredHeaders.Contains(attribute.Key.ToLower()))
                         {
                             request.AddHeader(attribute.Key, value);
+                            count++;
                         }
                     }
+                }
+                
+                if (count > 0)
+                {
+                    logger.Trace($"Unpacked {count} SNS message attributes as headers");
                 }
             }
             catch
             {
-                // Ignored.
+                // Ignored - not an SNS envelope
             }
         }
 
@@ -87,10 +94,9 @@ namespace AWSRedrive
                     request.AddQueryParameter(p.Name, p.Value.ToString());
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                Logger.Warn(ex, $"Error parsing message and adding query parameters. GET request might be incorrect.");
-                Logger.Warn($"Message was [{message}]");
+                // If parsing fails, just use the request without query parameters
             }
 
             return request;
@@ -129,45 +135,79 @@ namespace AWSRedrive
             return options;
         }
 
-        public void AddAuthentication(RestClient client, RestRequest request, ConfigurationEntry configurationEntry)
+        public void AddAuthentication(RestClient client, RestRequest request, ConfigurationEntry configurationEntry, EntryLogger logger)
         {
             if (!string.IsNullOrEmpty(configurationEntry.AwsGatewayToken))
             {
                 request.AddHeader("x-api-key", configurationEntry.AwsGatewayToken);
+                logger.Trace("Added x-api-key header");
             }
 
             if (!string.IsNullOrEmpty(configurationEntry.AuthToken))
             {
                 request.AddHeader("Authorization", configurationEntry.AuthToken);
+                logger.Trace("Added Authorization header");
+            }
+
+            if (!string.IsNullOrEmpty(configurationEntry.BasicAuthUserName))
+            {
+                logger.Trace("Using Basic authentication");
             }
         }
 
-        public void AddAttributes(RestRequest request, Dictionary<string, string> attributes)
+        public void AddAttributes(RestRequest request, Dictionary<string, string> attributes, EntryLogger logger)
         {
-            if (attributes != null)
+            if (attributes == null || attributes.Count == 0)
             {
-                foreach (var key in attributes.Keys.Where(key => !string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(attributes[key])))
-                {
-                    if (!_ignoredHeaders.Contains(key.ToLower()))
-                    {
-                        request.AddHeader(key, attributes[key]);
-                    }
-                }
-            }
-        }
-
-        private void SendRequest(RestClient client, RestRequest request, ConfigurationEntry configurationEntry)
-        {
-            Logger.Trace($"Posting to {configurationEntry.RedriveUrl}");
-            var response = client.ExecuteAsync(request).Result;
-
-            if (response.IsSuccessful)
-            {
-                Logger.Trace($"Post to {configurationEntry.RedriveUrl} successful");
                 return;
             }
 
-            Logger.Trace($"Post to {configurationEntry.RedriveUrl} failed (status code [{response.StatusCode}], error [{response.ErrorMessage}])");
+            var count = 0;
+            foreach (var key in attributes.Keys.Where(key => !string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(attributes[key])))
+            {
+                if (!_ignoredHeaders.Contains(key.ToLower()))
+                {
+                    request.AddHeader(key, attributes[key]);
+                    count++;
+                }
+            }
+
+            if (count > 0)
+            {
+                logger.Trace($"Added {count} message attributes as headers");
+            }
+        }
+
+        private void SendRequest(RestClient client, RestRequest request, ConfigurationEntry configurationEntry, EntryLogger logger)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var response = client.ExecuteAsync(request).Result;
+            stopwatch.Stop();
+
+            var elapsed = stopwatch.ElapsedMilliseconds;
+
+            if (response.IsSuccessful)
+            {
+                logger.Debug($"Response: {(int)response.StatusCode} {response.StatusCode} ({elapsed}ms)");
+                if (logger.IsTraceEnabled && !string.IsNullOrEmpty(response.Content))
+                {
+                    var preview = response.Content.Length > 500 
+                        ? response.Content.Substring(0, 500) + "..." 
+                        : response.Content;
+                    logger.Trace($"Response body ({response.Content.Length} chars): {preview}");
+                }
+                return;
+            }
+
+            logger.Debug($"Request failed: {(int)response.StatusCode} {response.StatusCode} ({elapsed}ms)");
+            if (logger.IsTraceEnabled && !string.IsNullOrEmpty(response.Content))
+            {
+                var preview = response.Content.Length > 500 
+                    ? response.Content.Substring(0, 500) + "..." 
+                    : response.Content;
+                logger.Trace($"Error response ({response.Content.Length} chars): {preview}");
+            }
+
             if (response.ErrorException != null)
             {
                 throw response.ErrorException;

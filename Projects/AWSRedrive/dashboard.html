@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWSRedrive Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23ff6b35'/%3E%3Cpath d='M8 16h12M16 11l5 5-5 5' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M10 10v-2h12v16h-12v-2' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' opacity='0.6'/%3E%3C/svg%3E">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        xe: { orange: '#ff6b35', dark: '#1a1a2e', gray: '#f8f9fa', text: '#2d3436' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .message-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+        .message-content.expanded { max-height: 500px; }
+        pre { white-space: pre-wrap; word-wrap: break-word; }
+        .sparkline-container { width: 100%; height: 50px; }
+        .sparkline-container svg { width: 100%; height: 100%; }
+        .alias-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    </style>
+</head>
+<body class="bg-xe-gray dark:bg-gray-900 min-h-screen font-sans text-xe-text dark:text-gray-200 transition-colors duration-200">
+    <header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors duration-200">
+        <div class="w-full px-4 lg:px-6 py-3">
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="flex items-center gap-3">
+                    <h1 class="text-lg sm:text-xl font-bold text-xe-dark dark:text-white whitespace-nowrap flex items-center gap-2">
+                        <svg class="w-7 h-7 text-xe-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h11M13 7l5 5-5 5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7V5h10v14H7v-2" opacity="0.5"/></svg>
+                        AWSRedrive
+                    </h1>
+                    <span id="connectionStatus" class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">Connecting...</span>
+                </div>
+                <div class="flex-1 min-w-0"></div>
+                <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                    <div class="relative">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <input type="text" id="search" placeholder="Search..." 
+                            class="w-32 sm:w-48 lg:w-64 pl-9 pr-8 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:border-xe-orange focus:ring-1 focus:ring-xe-orange">
+                        <button id="clearSearch" onclick="clearSearch()" 
+                            class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hidden">✕</button>
+                    </div>
+                    <select id="sortBy" onchange="filterAndRender()" class="px-2 sm:px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:border-xe-orange">
+                        <option value="alias">Sort: Name</option>
+                        <option value="type">Sort: Type</option>
+                        <option value="host">Sort: Host</option>
+                        <option value="received">Sort: Received</option>
+                        <option value="failed">Sort: Failed</option>
+                        <option value="uptime">Sort: Uptime</option>
+                        <option value="recent">Sort: Recent</option>
+                    </select>
+                    <select id="groupBy" onchange="filterAndRender()" class="hidden sm:block px-2 sm:px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:border-xe-orange">
+                        <option value="none">Group: None</option>
+                        <option value="type">Group: Type</option>
+                        <option value="status">Group: Status</option>
+                        <option value="host">Group: Host</option>
+                    </select>
+                    <div class="flex border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                        <button onclick="setView('cards')" id="viewCards" class="px-2 sm:px-3 py-2 text-sm bg-xe-orange text-white" title="Cards">▦</button>
+                        <button onclick="setView('table')" id="viewTable" class="px-2 sm:px-3 py-2 text-sm bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600" title="Table">☰</button>
+                        <button onclick="setView('compact')" id="viewCompact" class="px-2 sm:px-3 py-2 text-sm bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600" title="Compact">≡</button>
+                    </div>
+                    <div class="hidden md:flex items-center gap-1 border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                    <button id="liveBtn" onclick="toggleLiveMode()" class="px-3 py-2 text-sm font-medium transition bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600" title="Live updates (5 sec)">
+                        <span id="liveIcon" class="w-2 h-2 rounded-full bg-current"></span> <span id="liveText">Live</span>
+                    </button>
+                    <select id="refreshRate" onchange="saveRefreshRate()" class="px-2 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 border-l border-gray-200 dark:border-gray-600 focus:outline-none">
+                        <option value="60000">1 min</option>
+                        <option value="300000" selected>5 min</option>
+                        <option value="600000">10 min</option>
+                        <option value="0">Manual</option>
+                    </select>
+                </div>
+                <button onclick="fetchData()" class="px-3 py-2 bg-xe-orange hover:bg-orange-600 text-white text-sm font-semibold rounded-lg transition flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                </button>
+                <button onclick="toggleDarkMode()" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition" title="Toggle dark mode">
+                    <span class="hidden dark:inline">☀️</span>
+                    <span class="inline dark:hidden">🌙</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="w-full px-4 lg:px-6 py-4 lg:py-6">
+        <div id="summary" class="mb-4 p-3 sm:p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm flex flex-wrap gap-4 sm:gap-8 items-center"></div>
+        <p id="resultCount" class="text-sm text-gray-500 dark:text-gray-400 mb-4"></p>
+        <div id="cards" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 lg:gap-5">
+            <p class="text-center text-gray-400 col-span-full py-16">Connecting to server...</p>
+        </div>
+    </main>
+
+<script>
+let allEntries = [];
+let evtSource = null;
+let pollInterval = null;
+let reconnectAttempts = 0;
+const maxReconnectAttempts = 3;
+const reconnectDelay = 2000;
+
+// Refresh settings
+let isLiveMode = false;
+let liveTimeout = null;
+let currentView = 'cards';
+const LIVE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+const LIVE_POLL_MS = 5000; // 5 seconds
+
+const expandedMessages = new Set();
+
+const metricsHistory = {};
+const maxHistoryPoints = 30;
+
+// Load settings from localStorage
+const loadSettings = () => {
+    const stored = localStorage.getItem('dashboardSettings');
+    if (stored) {
+        try {
+            const settings = JSON.parse(stored);
+            document.getElementById('refreshRate').value = settings.refreshRate || '300000';
+            document.getElementById('sortBy').value = settings.sortBy || 'alias';
+            document.getElementById('groupBy').value = settings.groupBy || 'none';
+            if (settings.view) setView(settings.view, false);
+        } catch (e) {}
+    }
+};
+
+const saveSettings = () => {
+    localStorage.setItem('dashboardSettings', JSON.stringify({
+        refreshRate: document.getElementById('refreshRate').value,
+        sortBy: document.getElementById('sortBy').value,
+        groupBy: document.getElementById('groupBy').value,
+        view: currentView
+    }));
+};
+
+const setView = (view, render = true) => {
+    currentView = view;
+    ['cards', 'table', 'compact'].forEach(v => {
+        const btn = document.getElementById('view' + v.charAt(0).toUpperCase() + v.slice(1));
+        if (v === view) {
+            btn.classList.add('bg-xe-orange', 'text-white');
+            btn.classList.remove('bg-white', 'dark:bg-gray-700');
+        } else {
+            btn.classList.remove('bg-xe-orange', 'text-white');
+            btn.classList.add('bg-white', 'dark:bg-gray-700');
+        }
+    });
+    saveSettings();
+    if (render) filterAndRender();
+};
+
+const saveRefreshRate = () => {
+    saveSettings();
+    if (!isLiveMode) startPolling();
+};
+
+const toggleLiveMode = () => {
+    isLiveMode = !isLiveMode;
+    const btn = document.getElementById('liveBtn');
+    const icon = document.getElementById('liveIcon');
+    const text = document.getElementById('liveText');
+    
+    if (isLiveMode) {
+        btn.classList.add('bg-green-500', 'text-white');
+        btn.classList.remove('bg-white', 'dark:bg-gray-700');
+        icon.classList.add('bg-red-500', 'animate-pulse');
+        icon.classList.remove('bg-current');
+        startLiveCountdown();
+        // Use SSE for true real-time updates in Live mode
+        connectSSE();
+    } else {
+        btn.classList.remove('bg-green-500', 'text-white');
+        btn.classList.add('bg-white', 'dark:bg-gray-700');
+        icon.classList.remove('bg-red-500', 'animate-pulse');
+        icon.classList.add('bg-current');
+        text.textContent = 'Live';
+        if (liveTimeout) clearTimeout(liveTimeout);
+        // Disconnect SSE and switch to polling
+        if (evtSource) { evtSource.close(); evtSource = null; }
+        startPolling();
+    }
+};
+
+const startLiveCountdown = () => {
+    let remaining = LIVE_DURATION_MS / 1000;
+    const text = document.getElementById('liveText');
+    
+    const tick = () => {
+        if (!isLiveMode) return;
+        const min = Math.floor(remaining / 60);
+        const sec = remaining % 60;
+        text.textContent = `${min}:${sec.toString().padStart(2, '0')}`;
+        remaining--;
+        
+        if (remaining < 0) {
+            toggleLiveMode(); // Turn off
+            showNotification('Live mode ended', 'info');
+        } else {
+            liveTimeout = setTimeout(tick, 1000);
+        }
+    };
+    tick();
+};
+
+const getPollDelay = () => {
+    if (isLiveMode) return LIVE_POLL_MS;
+    const rate = parseInt(document.getElementById('refreshRate').value);
+    return rate || 0; // 0 = manual
+};
+
+const initDarkMode = () => {
+    const stored = localStorage.getItem('darkMode');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.classList.toggle('dark', stored === 'true' || (stored === null && prefersDark));
+};
+const toggleDarkMode = () => {
+    localStorage.setItem('darkMode', document.documentElement.classList.toggle('dark'));
+};
+initDarkMode();
+loadSettings();
+
+const setStatus = (status, color) => {
+    const el = document.getElementById('connectionStatus');
+    el.textContent = status;
+    el.className = `px-2 py-1 text-xs rounded-full ${color}`;
+};
+
+const relativeTime = (dateStr) => {
+    if (!dateStr) return '-';
+    const d = new Date(dateStr);
+    if (isNaN(d)) return dateStr;
+    const diff = (Date.now() - d) / 1000;
+    if (diff < 0) return 'just now';
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+};
+
+const updateMetricsHistory = (entries) => {
+    entries.forEach(e => {
+        if (!e.metrics) return;
+        const alias = e.alias;
+        if (!metricsHistory[alias]) {
+            metricsHistory[alias] = { received: [], sent: [], failed: [] };
+        }
+        const h = metricsHistory[alias];
+        h.received.push(e.metrics.messagesReceived || 0);
+        h.sent.push(e.metrics.messagesSent || 0);
+        h.failed.push(e.metrics.messagesFailed || 0);
+        if (h.received.length > maxHistoryPoints) {
+            h.received.shift();
+            h.sent.shift();
+            h.failed.shift();
+        }
+    });
+};
+
+const calcDeltas = (data) => {
+    if (!data || data.length < 2) return [];
+    const deltas = [];
+    for (let i = 1; i < data.length; i++) {
+        deltas.push(Math.max(0, data[i] - data[i - 1]));
+    }
+    return deltas;
+};
+
+const combinedSparkline = (history) => {
+    const rd = calcDeltas(history.received);
+    const sd = calcDeltas(history.sent);
+    const fd = calcDeltas(history.failed);
+    
+    if (rd.length < 2) {
+        return `<svg viewBox="0 0 100 50" preserveAspectRatio="none"><text x="50" y="28" text-anchor="middle" fill="#9ca3af" font-size="8">Collecting data...</text></svg>`;
+    }
+    
+    const max = Math.max(...rd, ...sd, ...fd, 1);
+    const w = 100, h = 50, p = 2;
+    const cw = w - p * 2, ch = h - p * 2;
+    
+    const toPoints = (d) => d.length ? d.map((v, i) => `${(p + (i / (d.length - 1 || 1)) * cw).toFixed(1)},${(p + ch - (v / max) * ch).toFixed(1)}`).join(' ') : '';
+    const toArea = (d, pts) => pts ? `${p},${h - p} ${pts} ${p + cw},${h - p}` : '';
+    
+    const rp = toPoints(rd), sp = toPoints(sd), fp = toPoints(fd);
+    
+    return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+        <line x1="${p}" y1="${h - p}" x2="${w - p}" y2="${h - p}" stroke="#e5e7eb" stroke-width="0.5"/>
+        ${rp ? `<polygon points="${toArea(rd, rp)}" fill="#ff6b35" fill-opacity="0.15"/>` : ''}
+        ${sp ? `<polygon points="${toArea(sd, sp)}" fill="#22c55e" fill-opacity="0.15"/>` : ''}
+        ${fp ? `<polygon points="${toArea(fd, fp)}" fill="#ef4444" fill-opacity="0.2"/>` : ''}
+        ${rp ? `<polyline points="${rp}" fill="none" stroke="#ff6b35" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+        ${sp ? `<polyline points="${sp}" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+        ${fp ? `<polyline points="${fp}" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+    </svg>`;
+};
+
+const getAwsConsoleUrl = (queueUrl, region) => {
+    if (!queueUrl || !queueUrl.includes('sqs.')) return null;
+    const r = region || queueUrl.match(/sqs\.([a-z0-9-]+)\.amazonaws/)?.[1];
+    if (!r) return null;
+    return `https://${r}.console.aws.amazon.com/sqs/v3/home?region=${r}#/queues/${encodeURIComponent(queueUrl)}`;
+};
+
+const showNotification = (message, type) => {
+    const existing = document.getElementById('notification');
+    if (existing) existing.remove();
+    
+    const colors = type === 'success' 
+        ? 'bg-green-500 text-white' 
+        : 'bg-red-500 text-white';
+    
+    const div = document.createElement('div');
+    div.id = 'notification';
+    div.className = `fixed bottom-4 right-4 px-4 py-2 rounded-lg shadow-lg ${colors} transition-opacity duration-300`;
+    div.textContent = message;
+    document.body.appendChild(div);
+    
+    setTimeout(() => {
+        div.style.opacity = '0';
+        setTimeout(() => div.remove(), 300);
+    }, 3000);
+};
+
+const fetchData = async () => {
+    try {
+        const response = await fetch('/api/status');
+        if (!response.ok) throw new Error('API error');
+        const data = await response.json();
+        allEntries = data;
+        updateMetricsHistory(data);
+        filterAndRender();
+        setStatus('Connected (polling)', 'bg-green-100 text-green-700');
+        return true;
+    } catch (e) {
+        setStatus('Error', 'bg-red-100 text-red-700');
+        return false;
+    }
+};
+
+const startPolling = () => {
+    stopPolling();
+    const delay = getPollDelay();
+    if (delay === 0) {
+        setStatus('Manual refresh', 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300');
+        return;
+    }
+    fetchData();
+    pollInterval = setInterval(fetchData, delay);
+    if (isLiveMode) {
+        setStatus('Live (5s)', 'bg-green-100 text-green-700');
+    } else {
+        const mins = delay / 60000;
+        setStatus(`Auto (${mins}m)`, 'bg-blue-100 text-blue-700');
+    }
+};
+
+const stopPolling = () => {
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+};
+
+const connectSSE = () => {
+    if (evtSource) evtSource.close();
+    stopPolling();
+    setStatus('Connecting...', 'bg-yellow-100 text-yellow-700');
+    
+    try {
+        evtSource = new EventSource('/api/stream');
+        evtSource.onopen = () => { setStatus('Live', 'bg-green-100 text-green-700'); reconnectAttempts = 0; };
+        evtSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                allEntries = data;
+                updateMetricsHistory(data);
+                filterAndRender();
+            } catch (e) {}
+        };
+        evtSource.onerror = () => {
+            evtSource.close();
+            evtSource = null;
+            if (isLiveMode && reconnectAttempts < maxReconnectAttempts) {
+                reconnectAttempts++;
+                setStatus(`Reconnecting (${reconnectAttempts}/${maxReconnectAttempts})...`, 'bg-yellow-100 text-yellow-700');
+                setTimeout(connectSSE, reconnectDelay);
+            } else {
+                // Fall back to polling
+                if (isLiveMode) {
+                    showNotification('SSE failed, using polling', 'info');
+                }
+                startPolling();
+            }
+        };
+    } catch (e) { startPolling(); }
+};
+
+const reconnect = () => {
+    reconnectAttempts = 0;
+    stopPolling();
+    if (evtSource) { evtSource.close(); evtSource = null; }
+    if (isLiveMode) {
+        connectSSE();
+    } else {
+        startPolling();
+    }
+};
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        if (evtSource) { evtSource.close(); evtSource = null; }
+        stopPolling();
+        setStatus('Paused', 'bg-gray-100 text-gray-600');
+    } else { 
+        if (isLiveMode) {
+            connectSSE();
+        } else {
+            startPolling();
+        }
+    }
+});
+
+const formatUptime = (s) => {
+    if (!s) return '-';
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+    return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m ${s % 60}s`;
+};
+
+const highlight = (text, q) => {
+    if (!q || !text) return text || '-';
+    return text.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'), '<mark class="bg-yellow-200 dark:bg-yellow-600 rounded px-0.5">$1</mark>');
+};
+
+const beautifyJson = (str) => {
+    if (!str) return '';
+    try { return JSON.stringify(JSON.parse(str), null, 2); } catch { return str; }
+};
+
+const escapeHtml = (str) => {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+};
+
+const toggleMessage = (alias) => {
+    const el = document.getElementById(`msg-${alias}`);
+    const icon = document.getElementById(`icon-${alias}`);
+    if (el) {
+        el.classList.toggle('expanded');
+        expandedMessages.has(alias) ? expandedMessages.delete(alias) : expandedMessages.add(alias);
+        icon.textContent = el.classList.contains('expanded') ? '▼' : '▶';
+    }
+};
+
+const getEntryType = (e) => {
+    if (e.redriveUrl) return 'HTTP';
+    if (e.redriveKafkaTopic) return 'Kafka';
+    if (e.redriveScript) return 'PowerShell';
+    return 'Unknown';
+};
+
+const getTargetHost = (e) => {
+    if (e.redriveUrl) {
+        try { return new URL(e.redriveUrl).host; } catch { return e.redriveUrl; }
+    }
+    if (e.kafkaBootstrapServers) return e.kafkaBootstrapServers.split(',')[0];
+    if (e.redriveKafkaTopic) return e.redriveKafkaTopic;
+    if (e.redriveScript) return 'Local Script';
+    return 'Unknown';
+};
+
+const sortEntries = (entries) => {
+    const sortBy = document.getElementById('sortBy').value;
+    return [...entries].sort((a, b) => {
+        const ma = a.metrics || {}, mb = b.metrics || {};
+        switch (sortBy) {
+            case 'type': return getEntryType(a).localeCompare(getEntryType(b));
+            case 'host': return getTargetHost(a).localeCompare(getTargetHost(b));
+            case 'received': return (mb.messagesReceived || 0) - (ma.messagesReceived || 0);
+            case 'failed': return (mb.messagesFailed || 0) - (ma.messagesFailed || 0);
+            case 'uptime': return (mb.uptimeSeconds || 0) - (ma.uptimeSeconds || 0);
+            case 'recent': return new Date(mb.lastMessageReceived || 0) - new Date(ma.lastMessageReceived || 0);
+            default: return (a.alias || '').localeCompare(b.alias || '');
+        }
+    });
+};
+
+const filterAndRender = () => {
+    saveSettings();
+    const q = document.getElementById('search').value.toLowerCase().trim();
+    document.getElementById('clearSearch').classList.toggle('hidden', !q);
+    
+    const filtered = allEntries.filter(e => !q || 
+        [e.alias, e.queueUrl, e.region, e.redriveUrl, e.redriveScript, e.redriveKafkaTopic, e.logLevel, e.active ? 'active' : 'inactive']
+        .filter(Boolean).join(' ').toLowerCase().includes(q)
+    );
+    
+    const sorted = sortEntries(filtered);
+    
+    // Summary
+    const totals = allEntries.reduce((acc, e) => {
+        acc.received += e.metrics?.messagesReceived || 0;
+        acc.sent += e.metrics?.messagesSent || 0;
+        acc.failed += e.metrics?.messagesFailed || 0;
+        return acc;
+    }, { received: 0, sent: 0, failed: 0 });
+    
+    const activeCount = allEntries.filter(e => e.active).length;
+    const errorCount = allEntries.filter(e => e.metrics?.messagesFailed > 0 || e.metrics?.lastErrorMessage).length;
+    
+    // Find max uptime for service running time
+    const maxUptime = Math.max(...allEntries.map(e => e.metrics?.uptimeSeconds || 0));
+    const serviceUptime = maxUptime > 0 ? formatUptime(maxUptime) : null;
+    
+    document.getElementById('summary').innerHTML = `
+        <div class="flex items-center gap-2">
+            <span class="text-2xl font-bold text-xe-orange">${totals.received.toLocaleString()}</span>
+            <span class="text-gray-500 dark:text-gray-400 text-sm">received</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-2xl font-bold text-green-500">${totals.sent.toLocaleString()}</span>
+            <span class="text-gray-500 dark:text-gray-400 text-sm">sent</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-2xl font-bold ${totals.failed > 0 ? 'text-red-500' : 'text-gray-400'}">${totals.failed.toLocaleString()}</span>
+            <span class="text-gray-500 dark:text-gray-400 text-sm">failed</span>
+        </div>
+        <div class="ml-auto flex items-center gap-4 text-sm">
+            ${errorCount > 0 ? `<span class="px-2 py-1 text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full font-medium">⚠ ${errorCount} with errors</span>` : ''}
+            <span class="text-gray-500 dark:text-gray-400">${activeCount}/${allEntries.length} active</span>
+            ${serviceUptime ? `<span class="text-gray-400 dark:text-gray-500" title="Service uptime (stats reset on restart)">↑ ${serviceUptime}</span>` : ''}
+        </div>
+    `;
+    
+    document.getElementById('resultCount').textContent = q 
+        ? `Found ${filtered.length} of ${allEntries.length} configurations` 
+        : `${allEntries.length} configurations`;
+    
+    renderGroupedCards(sorted, q);
+};
+
+const clearSearch = () => { document.getElementById('search').value = ''; filterAndRender(); };
+
+const groupEntries = (entries) => {
+    const groupBy = document.getElementById('groupBy').value;
+    if (groupBy === 'none') return { '': entries };
+    
+    return entries.reduce((acc, e) => {
+        let key;
+        switch (groupBy) {
+            case 'type': key = getEntryType(e); break;
+            case 'status': key = e.active ? 'Active' : 'Inactive'; break;
+            case 'host': key = getTargetHost(e); break;
+            default: key = '';
+        }
+        (acc[key] = acc[key] || []).push(e);
+        return acc;
+    }, {});
+};
+
+const renderGroupedCards = (entries, q) => {
+    const container = document.getElementById('cards');
+    const groups = groupEntries(entries);
+    const groupNames = Object.keys(groups).sort();
+    
+    // Set container class based on view
+    if (currentView === 'table') {
+        container.className = 'w-full overflow-x-auto';
+    } else if (currentView === 'compact') {
+        container.className = 'space-y-1';
+    } else {
+        container.className = 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 lg:gap-5';
+    }
+    
+    if (groupNames.length === 1 && groupNames[0] === '') {
+        renderView(entries, q);
+        return;
+    }
+    
+    if (currentView === 'table') {
+        container.innerHTML = groupNames.map(name => `
+            <div class="mb-6">
+                <h2 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full ${name === 'Active' ? 'bg-green-500' : name === 'Inactive' ? 'bg-gray-400' : 'bg-xe-orange'}"></span>
+                    ${name} <span class="text-sm font-normal text-gray-400">(${groups[name].length})</span>
+                </h2>
+                ${renderTableContent(groups[name], q)}
+            </div>
+        `).join('');
+    } else if (currentView === 'compact') {
+        container.innerHTML = groupNames.map(name => `
+            <div class="mb-4">
+                <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full ${name === 'Active' ? 'bg-green-500' : name === 'Inactive' ? 'bg-gray-400' : 'bg-xe-orange'}"></span>
+                    ${name} <span class="text-xs font-normal text-gray-400">(${groups[name].length})</span>
+                </h2>
+                ${groups[name].map(e => renderCompactRow(e, q)).join('')}
+            </div>
+        `).join('');
+    } else {
+        container.innerHTML = groupNames.map(name => `
+            <div class="col-span-full">
+                <h2 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3 mt-4 first:mt-0 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full ${name === 'Active' ? 'bg-green-500' : name === 'Inactive' ? 'bg-gray-400' : 'bg-xe-orange'}"></span>
+                    ${name} <span class="text-sm font-normal text-gray-400">(${groups[name].length})</span>
+                </h2>
+            </div>
+            ${groups[name].map(e => renderCard(e, q)).join('')}
+        `).join('');
+    }
+};
+
+const renderView = (entries, q) => {
+    if (currentView === 'table') {
+        renderTable(entries, q);
+    } else if (currentView === 'compact') {
+        renderCompact(entries, q);
+    } else {
+        renderCards(entries, q);
+    }
+};
+
+const renderTable = (entries, q) => {
+    const container = document.getElementById('cards');
+    if (!entries.length) {
+        container.innerHTML = '<p class="text-center text-gray-400 py-16">No matching configurations</p>';
+        return;
+    }
+    container.innerHTML = renderTableContent(entries, q);
+};
+
+const renderTableContent = (entries, q) => {
+    const h = (t) => highlight(t, q);
+    return `
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm min-w-[700px]">
+            <thead>
+                <tr class="text-left text-xs text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+                    <th class="pb-2 font-medium">Alias</th>
+                    <th class="pb-2 font-medium hidden sm:table-cell">Type</th>
+                    <th class="pb-2 font-medium">Target</th>
+                    <th class="pb-2 font-medium text-right">Recv</th>
+                    <th class="pb-2 font-medium text-right">Sent</th>
+                    <th class="pb-2 font-medium text-right">Fail</th>
+                    <th class="pb-2 font-medium">Status</th>
+                    <th class="pb-2 font-medium hidden lg:table-cell">Log</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${entries.map(e => {
+                    const m = e.metrics || {};
+                    const entryType = getEntryType(e);
+                    const typeIcon = entryType === 'HTTP' ? '<span class="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded font-medium">HTTP</span>' : entryType === 'Kafka' ? '<span class="px-1.5 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded font-medium">Kafka</span>' : '<span class="px-1.5 py-0.5 text-xs bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded font-medium">PS</span>';
+                    const target = e.redriveUrl || e.redriveKafkaTopic || e.redriveScript || '-';
+                    const hasErrors = m.messagesFailed > 0;
+                    return `
+                        <tr class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 ${hasErrors ? 'bg-red-50/50 dark:bg-red-900/10' : ''}">
+                            <td class="py-2 font-medium text-xe-dark dark:text-white">
+                                <span class="sm:hidden">${typeIcon}</span> ${h(e.alias)}
+                            </td>
+                            <td class="py-2 hidden sm:table-cell">${typeIcon}</td>
+                            <td class="py-2 text-gray-600 dark:text-gray-400 max-w-[200px] lg:max-w-xs truncate" title="${target}">${h(target)}</td>
+                            <td class="py-2 text-right text-xe-orange font-medium">${(m.messagesReceived || 0).toLocaleString()}</td>
+                            <td class="py-2 text-right text-green-500 font-medium">${(m.messagesSent || 0).toLocaleString()}</td>
+                            <td class="py-2 text-right ${hasErrors ? 'text-red-500 font-bold' : 'text-gray-400'}">${(m.messagesFailed || 0).toLocaleString()}</td>
+                            <td class="py-2">
+                                <span class="px-1.5 sm:px-2 py-0.5 text-xs rounded-full ${e.active ? 'bg-green-100 dark:bg-green-900/30 text-green-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-500'}">${e.active ? 'On' : 'Off'}</span>
+                            </td>
+                            <td class="py-2 hidden lg:table-cell">
+                                <select onchange="changeLogLevel('${e.alias}', this.value)" class="text-xs bg-transparent border-0 p-0 focus:outline-none cursor-pointer" ${!e.active ? 'disabled' : ''}>
+                                    ${logLevelOptions.map(level => `<option value="${level}" ${(e.logLevel || 'Error') === level ? 'selected' : ''}>${level}</option>`).join('')}
+                                </select>
+                            </td>
+                        </tr>
+                    `;
+                }).join('')}
+            </tbody>
+        </table>
+        </div>
+    `;
+};
+
+const renderCompact = (entries, q) => {
+    const container = document.getElementById('cards');
+    if (!entries.length) {
+        container.innerHTML = '<p class="text-center text-gray-400 py-16">No matching configurations</p>';
+        return;
+    }
+    container.innerHTML = entries.map(e => renderCompactRow(e, q)).join('');
+};
+
+const renderCompactRow = (e, q) => {
+    const h = (t) => highlight(t, q);
+    const m = e.metrics || {};
+    const entryType = getEntryType(e);
+    const typeIcon = entryType === 'HTTP' ? '<span class="px-1 py-0.5 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded font-medium">H</span>' : entryType === 'Kafka' ? '<span class="px-1 py-0.5 text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded font-medium">K</span>' : '<span class="px-1 py-0.5 text-[10px] bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded font-medium">P</span>';
+    const hasErrors = m.messagesFailed > 0 || m.lastErrorMessage;
+    
+    return `
+        <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 px-3 py-2 bg-white dark:bg-gray-800 rounded border ${hasErrors ? 'border-l-4 border-l-red-500' : 'border-gray-100 dark:border-gray-700'} hover:bg-gray-50 dark:hover:bg-gray-700/50">
+            <span class="w-2 h-2 rounded-full shrink-0 ${e.active ? 'bg-green-500' : 'bg-gray-400'}"></span>
+            <span class="text-sm">${typeIcon}</span>
+            <span class="font-medium text-xe-dark dark:text-white min-w-[100px] sm:min-w-[120px]">${h(e.alias)}</span>
+            <span class="hidden md:block text-xs text-gray-500 dark:text-gray-400 flex-1 truncate">${h(e.redriveUrl || e.redriveKafkaTopic || e.redriveScript || '-')}</span>
+            <div class="flex items-center gap-2 sm:gap-3 ml-auto">
+                <span class="text-xs text-xe-orange font-medium w-12 sm:w-16 text-right">${(m.messagesReceived || 0).toLocaleString()}</span>
+                <span class="text-xs text-green-500 font-medium w-12 sm:w-16 text-right">${(m.messagesSent || 0).toLocaleString()}</span>
+                <span class="text-xs ${hasErrors ? 'text-red-500 font-bold' : 'text-gray-400'} w-10 sm:w-12 text-right">${(m.messagesFailed || 0).toLocaleString()}</span>
+                <select onchange="changeLogLevel('${e.alias}', this.value)" class="hidden sm:block text-xs bg-gray-100 dark:bg-gray-700 rounded px-1 py-0.5 w-16" ${!e.active ? 'disabled' : ''}>
+                    ${logLevelOptions.map(level => `<option value="${level}" ${(e.logLevel || 'Error') === level ? 'selected' : ''}>${level}</option>`).join('')}
+                </select>
+            </div>
+        </div>
+    `;
+};
+
+const logLevelOptions = ['Trace', 'Debug', 'Info', 'Warn', 'Error', 'Fatal'];
+
+const changeLogLevel = async (alias, level) => {
+    try {
+        const response = await fetch(`/api/loglevel/${encodeURIComponent(alias)}?level=${level}`, { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification(`Log level for "${alias}" → ${level} (reverts in 30 min)`, 'success');
+            const entry = allEntries.find(e => e.alias === alias);
+            if (entry) entry.logLevel = level;
+            filterAndRender();
+        } else {
+            showNotification(`Failed: ${data.error}`, 'error');
+        }
+    } catch (e) {
+        showNotification(`Error: ${e.message}`, 'error');
+    }
+};
+
+const renderCard = (e, q) => {
+    const h = (t) => highlight(t, q);
+    const m = e.metrics || {};
+    const safeAlias = (e.alias || 'unnamed').replace(/[^a-zA-Z0-9]/g, '_');
+    const isExpanded = expandedMessages.has(safeAlias);
+    const history = metricsHistory[e.alias] || { received: [], sent: [], failed: [] };
+    const awsUrl = getAwsConsoleUrl(e.queueUrl, e.region);
+    const currentLevel = e.logLevel || 'Error';
+    const hasErrors = m.messagesFailed > 0 || m.lastErrorMessage;
+    const entryType = getEntryType(e);
+    const typeIcon = entryType === 'HTTP' ? '<span class="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded font-medium">HTTP</span>' : entryType === 'Kafka' ? '<span class="px-1.5 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded font-medium">Kafka</span>' : entryType === 'PowerShell' ? '<span class="px-1.5 py-0.5 text-xs bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded font-medium">PS</span>' : '<span class="px-1.5 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded font-medium">?</span>';
+    
+    return `
+    <div class="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border ${hasErrors ? 'border-l-4 border-l-red-500' : ''} border-gray-100 dark:border-gray-700 hover:shadow-md transition">
+        <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
+            <span class="shrink-0" title="${entryType}">${typeIcon}</span>
+            <span class="font-semibold text-xe-dark dark:text-white alias-title flex-1" title="${e.alias || 'Unnamed'}">${h(e.alias) || 'Unnamed'}</span>
+            <span class="w-2 h-2 rounded-full shrink-0 ${e.active ? 'bg-green-500' : 'bg-gray-400'}" title="${e.active ? 'Active' : 'Inactive'}"></span>
+        </div>
+        
+        <div class="bg-gray-50 dark:bg-gray-800/50 px-5 py-3">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-xe-orange"></span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Received</span>
+                        <span class="text-sm font-semibold text-xe-orange">${(m.messagesReceived || 0).toLocaleString()}</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Sent</span>
+                        <span class="text-sm font-semibold text-green-500">${(m.messagesSent || 0).toLocaleString()}</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Failed</span>
+                        <span class="text-sm font-semibold ${m.messagesFailed > 0 ? 'bg-red-500 text-white px-1.5 rounded' : 'text-red-500'}">${(m.messagesFailed || 0).toLocaleString()}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="sparkline-container">${combinedSparkline(history)}</div>
+        </div>
+        
+        <div class="px-5 py-4 space-y-3 text-sm">
+            <div>
+                <div class="text-xs text-gray-400 mb-0.5">Queue URL</div>
+                ${awsUrl 
+                    ? `<a href="${awsUrl}" target="_blank" class="text-blue-500 hover:text-blue-600 hover:underline break-all flex items-start gap-1" title="Open in AWS Console">
+                        <span>${h(e.queueUrl)}</span>
+                        <span class="text-gray-400 shrink-0">↗</span>
+                       </a>`
+                    : `<div class="text-gray-700 dark:text-gray-300 break-all">${h(e.queueUrl)}</div>`
+                }
+            </div>
+            <div>
+                <div class="text-xs text-gray-400 mb-0.5">Target (${entryType})</div>
+                <div class="text-gray-700 dark:text-gray-300 break-all">${h(e.redriveUrl || e.redriveScript || e.redriveKafkaTopic) || '-'}</div>
+                <div class="flex flex-wrap items-center gap-1 mt-1.5 text-xs">
+                    ${e.useGET ? '<span class="px-1.5 py-0.5 bg-xe-orange/10 dark:bg-xe-orange/20 text-xe-orange rounded font-medium">GET</span>' : ''}
+                    ${e.usePUT ? '<span class="px-1.5 py-0.5 bg-xe-orange/10 dark:bg-xe-orange/20 text-xe-orange rounded font-medium">PUT</span>' : ''}
+                    ${e.useDelete ? '<span class="px-1.5 py-0.5 bg-xe-orange/10 dark:bg-xe-orange/20 text-xe-orange rounded font-medium">DEL</span>' : ''}
+                    ${!e.useGET && !e.usePUT && !e.useDelete ? '<span class="px-1.5 py-0.5 bg-xe-orange/10 dark:bg-xe-orange/20 text-xe-orange rounded font-medium">POST</span>' : ''}
+                    ${e.hasAccessKey ? '<span class="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded font-medium">AWS</span>' : ''}
+                    ${e.hasAuthToken ? '<span class="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded font-medium">Token</span>' : ''}
+                    ${e.hasBasicAuth ? '<span class="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded font-medium">Basic</span>' : ''}
+                    ${e.hasAwsGatewayToken ? '<span class="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded font-medium">API</span>' : ''}
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+                <div class="flex items-center gap-1">
+                    <span class="text-gray-400">Region:</span>
+                    <span class="text-gray-700 dark:text-gray-300">${h(e.region) || '-'}</span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="text-gray-400">Timeout:</span>
+                    <span class="text-gray-700 dark:text-gray-300">${e.timeout ? e.timeout + 'ms' : '-'}</span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="text-gray-400">Log:</span>
+                    <select onchange="changeLogLevel('${e.alias}', this.value)" 
+                        class="text-xs bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-1 py-0.5 focus:outline-none focus:border-xe-orange cursor-pointer"
+                        ${!e.active ? 'disabled' : ''}>
+                        ${logLevelOptions.map(level => 
+                            `<option value="${level}" ${currentLevel === level ? 'selected' : ''}>${level}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+            </div>
+            
+            ${m.lastMessageContent ? `
+            <div class="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                <button onclick="toggleMessage('${safeAlias}')" 
+                    class="w-full px-3 py-2 text-left text-xs bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2 transition">
+                    <span id="icon-${safeAlias}" class="text-gray-400">${isExpanded ? '▼' : '▶'}</span>
+                    <span class="text-gray-600 dark:text-gray-300 font-medium">Last Message</span>
+                    <span class="text-gray-400 ml-auto">${relativeTime(m.lastMessageReceived)}</span>
+                </button>
+                <div id="msg-${safeAlias}" class="message-content ${isExpanded ? 'expanded' : ''}">
+                    <pre class="p-3 text-xs bg-gray-900 text-green-400 overflow-auto max-h-96">${escapeHtml(beautifyJson(m.lastMessageContent))}</pre>
+                </div>
+            </div>` : ''}
+            
+            ${m.lastErrorMessage ? `
+            <div class="p-2 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-lg">
+                <div class="text-xs text-red-400 mb-0.5">Last Error (${relativeTime(m.lastError)})</div>
+                <div class="text-red-600 dark:text-red-400 text-xs">${escapeHtml(m.lastErrorMessage)}</div>
+            </div>` : ''}
+        </div>
+        
+        <div class="px-5 py-2.5 text-xs text-gray-400 border-t border-gray-100 dark:border-gray-700 flex flex-wrap gap-x-4 gap-y-1">
+            <span class="${e.active ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}">${e.active ? 'Active' : 'Inactive'}</span>
+            ${m.uptimeSeconds ? `<span>Up: ${formatUptime(m.uptimeSeconds)}</span>` : ''}
+            ${m.startedAt ? `<span>Started: ${relativeTime(m.startedAt)}</span>` : ''}
+            ${m.lastMessageReceived ? `<span>↓ ${relativeTime(m.lastMessageReceived)}</span>` : ''}
+            ${m.lastMessageSent ? `<span>↑ ${relativeTime(m.lastMessageSent)}</span>` : ''}
+            ${m.lastError ? `<span class="text-red-500">⚠ ${relativeTime(m.lastError)}</span>` : ''}
+            ${e.dlqUrl ? `<a href="${getAwsConsoleUrl(e.dlqUrl, e.region)}" target="_blank" class="text-red-500 hover:text-red-600 hover:underline">DLQ ↗</a>` : ''}
+        </div>
+    </div>`;
+};
+
+const renderCards = (entries, q) => {
+    const container = document.getElementById('cards');
+    
+    if (!allEntries.length) {
+        container.innerHTML = '<p class="text-center text-gray-400 col-span-full py-16">No entries configured</p>';
+        return;
+    }
+    if (!entries.length) {
+        container.innerHTML = '<p class="text-center text-gray-400 col-span-full py-16">No matching configurations</p>';
+        return;
+    }
+    
+    container.innerHTML = entries.map(e => renderCard(e, q)).join('');
+};
+
+document.getElementById('search').addEventListener('input', filterAndRender);
+document.getElementById('search').addEventListener('keydown', e => e.key === 'Escape' && clearSearch());
+
+// Initialize with polling (SSE only used in Live mode)
+fetchData().then(() => startPolling());
+</script>
+</body>
+</html>

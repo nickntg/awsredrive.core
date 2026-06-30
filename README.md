@@ -10,22 +10,24 @@ Configuration is stored in config.json and is periodically read by AWSRedrive, t
 
 Here's a sample configuration entry for reading a queue and posting the messages found there to an endpoint:
 
-```js
-  {
-    "Alias": "#1",
-    "QueueUrl": "https://sqs.eu-west-1.amazonaws.com/accountid/inputqueue1",
-    "RedriveUrl": "http://nohost.com/",
-    "Region": "eu-west-1",
-    "Active": true,
-    "Timeout": 10000,
-    "ServiceUrl":  "https://www.google.com" 
-  }
+```json
+{
+  "Alias": "#1",
+  "QueueUrl": "https://sqs.eu-west-1.amazonaws.com/accountid/inputqueue1",
+  "RedriveUrl": "http://nohost.com/",
+  "Region": "eu-west-1",
+  "Active": true,
+  "Timeout": 10000,
+  "LogLevel": "Info",
+  "ServiceUrl": "https://www.google.com" 
+}
 ```
 
 Here are the elements of a configuration entry:
 * **Alias**. This is a unique name for each configuration entry.
 * **AccessKey**. The AWS access key to use when accessing SQS. If an access key is not found, AWSRedrive will not use one and rely on the AWS SDK to determine how to connect to SQS.
 * **SecretKey**. The AWS secret key to use when accessing SQS.
+* **Profile**. The AWS profile to use when accessing SQS. If specified, AWSRedrive will use credentials from the AWS credentials file.
 * **QueueUrl**. The URL of the SQS queue to read.
 * **Region**. The region of the SQS queue.
 * **RedriveUrl**. The endpoint of the service to post SQS messages to.
@@ -46,3 +48,194 @@ Here are the elements of a configuration entry:
 * **IgnoreCertificateErrors**. If set to True, AWSRedrive will ignore any certificate errors when connecting to the configured service endpoint.
 * **UnpackAttributesAsHeaders**. If set to True, AWSRedrive will try to treat the incoming message as being an [SNS envelope](https://docs.aws.amazon.com/sns/latest/dg/sns-message-and-json-formats.html), then unpack message attributes and transfer them as HTTP headers.
 * **ServiceUrl**. If configured, this value will be passed to the ServiceURL property of the AWS SDK. This is useful when working with [LocalStack](https://localstack.cloud/) instead of AWS.
+* **LogLevel**. The log level for this entry (Trace, Debug, Info, Warn, Error, Fatal). If not specified, uses the global `DefaultLogLevel` from appsettings.json.
+
+## Application Settings
+
+Application-wide settings are stored in appsettings.json:
+
+```json
+{
+  "DefaultLogLevel": "Error",
+  "Dashboard": { "Enabled": true, "Port": 5000, "RefreshIntervalMs": 1000 },
+  "Metrics": { "Enabled": true, "IntervalSeconds": 60 }
+}
+```
+
+* **DefaultLogLevel**. Default log level for aliases without explicit LogLevel (default: Error).
+* **Dashboard.Enabled**. Enables the web dashboard.
+* **Dashboard.Port**. Dashboard port (default: 5000).
+* **Dashboard.RefreshIntervalMs**. Dashboard refresh interval (default: 1000ms).
+* **Metrics.Enabled**. Enables periodic metrics logging.
+* **Metrics.IntervalSeconds**. Metrics logging interval (default: 60s).
+
+## Dashboard
+
+AWSRedrive includes a web dashboard for real-time monitoring at `http://localhost:5000`.
+
+### Views
+
+| View | Icon | Description |
+|------|------|-------------|
+| **Cards** | ▦ | Full details with sparklines (default) |
+| **Table** | ☰ | Compact sortable table |
+| **Compact** | ≡ | Minimal one-line rows |
+
+### Features
+
+- **Grouping:** None, Type (HTTP/Kafka/PowerShell), Status, Target Host
+- **Sorting:** Name, Type, Host, Received, Failed, Uptime, Recent Activity
+- **Refresh:** 1 min / 5 min (default) / 10 min / Manual
+- **Live Mode:** 5-second refresh, auto-stops after 5 minutes
+- **DLQ Link:** Auto-detected from SQS RedrivePolicy, links to AWS Console
+- **Log Level:** Runtime changes (revert after 30 min)
+- **Settings:** Persisted to browser localStorage
+
+### API
+
+```bash
+# Change log level (temporary)
+curl -X POST "http://localhost:5000/api/loglevel/MyAlias?level=Debug"
+
+# Get current status
+curl http://localhost:5000/api/status
+```
+
+### IAM Permissions
+
+The dashboard requires `sqs:GetQueueAttributes` to auto-detect DLQ URLs:
+
+```json
+{
+  "Effect": "Allow",
+  "Action": "sqs:GetQueueAttributes",
+  "Resource": "*"
+}
+```
+
+## Logging
+
+AWSRedrive uses structured JSON logging to file (`logs/awsredrive.log`):
+
+```json
+{"@timestamp":"2024-01-15T10:30:45.123Z","level":"DEBUG","alias":"Orders","messageId":"a1b2c3d4-e5f6-7890","message":"Message received"}
+```
+
+Log files are archived daily with date suffix (e.g., `awsredrive.2024-01-14.log`) and kept for 7 days.
+
+### Log Levels
+
+| Level | What's Logged |
+|-------|---------------|
+| **Error** | Process/delete failures with `messageId`, `messageContent`, `messageAttributes`, exception details |
+| **Warn** | Non-graceful stops, warnings |
+| **Info** | Processor start/stop, log level changes, metrics |
+| **Debug** | Message received/processed/deleted with timing, response status, attributes |
+| **Trace** | Message content, request/response bodies, detailed config |
+
+### Message Correlation
+
+Every message-related log includes `messageId` (the SQS Message ID) as a searchable field. Use it to:
+- Correlate with producer logs (producer receives MessageId from `SendMessageResponse`)
+- Find failed messages in DLQ via AWS Console
+- Track a message through the entire processing pipeline
+
+### Error Log Example
+
+```json
+{
+  "@timestamp": "2024-01-15T10:30:45.123Z",
+  "level": "ERROR",
+  "alias": "Orders",
+  "messageId": "a1b2c3d4-e5f6-7890",
+  "messageContent": "{\"orderId\":123}",
+  "messageAttributes": "correlation-id=xyz, source=orders-api",
+  "errorType": "HttpRequestException",
+  "errorMessage": "Connection refused",
+  "queueUrl": "https://sqs.../orders-queue",
+  "redriveUrl": "https://api.example.com/webhook"
+}
+```
+
+## Building
+
+Prerequisites: .NET 8 SDK or Docker.
+
+```bash
+make help    # Show all available commands
+```
+
+### Development
+
+```bash
+make run     # Run console app locally
+make watch   # Run with hot reload
+make test    # Run unit tests
+```
+
+### Build with Local .NET SDK
+
+```bash
+make all                       # Build console + service (runs tests first)
+make all-quick                 # Build without tests
+make console RUNTIME=linux-x64 # Cross-compile for specific runtime
+```
+
+### Build with Docker SDK (no local .NET required)
+
+Ideal for building Linux binaries from Mac/Windows:
+
+```bash
+make docker-build-all          # Test + build console + service for linux-x64
+make docker-build-all-quick    # Build without tests
+make docker-test               # Run tests in Docker
+```
+
+Output: `./publish/service-linux-x64/` and `./publish/console-linux-x64/`
+
+### Docker Image
+
+```bash
+make image                     # Build container image
+make image-run                 # Run container locally
+make image-push DOCKER_REGISTRY=ghcr.io/user DOCKER_TAG=1.0.0
+```
+
+### Options
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RUNTIME` | auto-detected | Target runtime (linux-x64, linux-arm64, osx-arm64, win-x64) |
+| `BUILD_RUNTIME` | linux-x64 | Target for docker-build-* commands |
+| `CONFIG` | Release | Build configuration |
+
+## Running with Docker
+
+```bash
+docker run --rm -it \
+    -v ./config.json:/app/config.json:ro \
+    -v ./appsettings.json:/app/appsettings.json:ro \
+    -p 5000:5000 \
+    awsredrive:latest
+```
+
+## Running as a Linux Service
+
+Build with `make docker-build-service` or `make service RUNTIME=linux-x64`, then create `/etc/systemd/system/awsredrive.service`:
+
+```ini
+[Unit]
+Description=AWSRedrive Service
+After=network.target
+
+[Service]
+Type=notify
+WorkingDirectory=/opt/awsredrive
+ExecStart=/opt/awsredrive/AWSRedrive.LinuxService
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable with `sudo systemctl enable --now awsredrive`.

@@ -7,6 +7,7 @@
     "Active": true,
     "Timeout": 10000,
     "UseGET": true, 
-    "ServiceUrl":  "https://www.google.com" 
+    "ServiceUrl":  "https://www.google.com",
+    "LogLevel": "Info" 
   }
 ]

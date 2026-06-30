@@ -26,5 +26,11 @@
         public bool IgnoreCertificateErrors { get; set; }
         public bool UnpackAttributesAsHeaders { get; set; }
         public string ServiceUrl { get; set; }
+        public string LogLevel { get; set; }
+        
+        /// <summary>
+        /// Dead Letter Queue URL - auto-populated from SQS RedrivePolicy on startup
+        /// </summary>
+        public string DlqUrl { get; set; }
     }
 }

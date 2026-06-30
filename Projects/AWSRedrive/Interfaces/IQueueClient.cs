@@ -8,5 +8,6 @@ namespace AWSRedrive.Interfaces
         void Init();
         IMessage GetMessage();
         void DeleteMessage(IMessage message);
+        string GetDlqUrl();
     }
 }

@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AWSRedrive.Interfaces;
+using AWSRedrive.Models;
 using NLog;
 
 namespace AWSRedrive
@@ -14,13 +16,14 @@ namespace AWSRedrive
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         private readonly IConfigurationReader _configurationReader;
+        private readonly IQueueProcessorFactory _queueProcessorFactory;
         private readonly IQueueClientFactory _queueClientFactory;
         private readonly IMessageProcessorFactory _messageProcessorFactory;
-        private readonly IQueueProcessorFactory _queueProcessorFactory;
         private readonly IConfigurationChangeManager _configurationChangeManager;
         private Task _task;
         private CancellationTokenSource _cancellation;
         private List<IQueueProcessor> _processors;
+        private readonly object _lock = new();
 
         public Orchestrator(IConfigurationReader configurationReader,
             IQueueClientFactory queueClientFactory,
@@ -55,22 +58,28 @@ namespace AWSRedrive
                 {
                     try
                     {
-                        _configurationChangeManager.ReadChanges(_configurationReader, _processors, _queueClientFactory, _messageProcessorFactory, _queueProcessorFactory);
+                        lock (_lock)
+                        {
+                            _configurationChangeManager.ReadChanges(_configurationReader, _processors, _queueClientFactory, _messageProcessorFactory, _queueProcessorFactory);
+                        }
                     }
                     catch (Exception e)
                     {
                         Logger.Error(e);
                     }
-                    
+
                     lastDateTimeChecked = DateTime.Now;
                 }
 
                 Thread.Sleep(1000);
             }
 
-            foreach (var processor in _processors)
+            lock (_lock)
             {
-                processor.Stop();
+                foreach (var processor in _processors)
+                {
+                    processor.Stop();
+                }
             }
 
             Thread.Sleep(5000);
@@ -86,6 +95,52 @@ namespace AWSRedrive
             _cancellation.Dispose();
             _task.Dispose();
             IsProcessing = false;
+        }
+
+        public bool SetLogLevel(string alias, string level)
+        {
+            lock (_lock)
+            {
+                if (_processors == null)
+                    return false;
+
+                var processor = _processors.Find(p => p.Configuration?.Alias == alias);
+                if (processor != null)
+                {
+                    processor.SetLogLevel(level);
+                    Logger.Info($"Set log level for {alias} to {level}");
+                    return true;
+                }
+            }
+
+            Logger.Warn($"Processor not found for alias: {alias}");
+            return false;
+        }
+
+        public string GetLogLevel(string alias)
+        {
+            lock (_lock)
+            {
+                if (_processors == null)
+                    return null;
+
+                var processor = _processors.Find(p => p.Configuration?.Alias == alias);
+                return processor?.GetLogLevel();
+            }
+        }
+
+        public List<ConfigurationEntry> GetConfigurations()
+        {
+            lock (_lock)
+            {
+                if (_processors == null)
+                    return new List<ConfigurationEntry>();
+
+                return _processors
+                    .Where(p => p.Configuration != null)
+                    .Select(p => p.Configuration)
+                    .ToList();
+            }
         }
     }
 }
