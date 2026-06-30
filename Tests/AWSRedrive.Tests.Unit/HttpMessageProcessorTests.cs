@@ -9,6 +9,8 @@ namespace AWSRedrive.Tests.Unit
 {
     public class HttpMessageProcessorTests
     {
+        private readonly EntryLogger _logger = new EntryLogger("Test", "Error");
+
         [Fact]
         public void VerifyGetRequestUrlConstruction()
         {
@@ -136,7 +138,7 @@ namespace AWSRedrive.Tests.Unit
                 entry.AuthToken = value;
             }
 
-            processor.AddAuthentication(null, request, entry);
+            processor.AddAuthentication(null, request, entry, _logger);
 
             Assert.Single(request.Parameters);
             var parameter = request.Parameters.TryFind(header);
@@ -175,15 +177,15 @@ namespace AWSRedrive.Tests.Unit
             var processor = new HttpMessageProcessor();
 
             var request = new RestRequest();
-            processor.AddAttributes(request, null);
+            processor.AddAttributes(request, null, _logger);
 
             Assert.Empty(request.Parameters);
 
-            processor.AddAttributes(request, new Dictionary<string, string>());
+            processor.AddAttributes(request, new Dictionary<string, string>(), _logger);
 
             Assert.Empty(request.Parameters);
 
-            processor.AddAttributes(request, new Dictionary<string, string> { { "a", "b" }, { "c", "d" } });
+            processor.AddAttributes(request, new Dictionary<string, string> { { "a", "b" }, { "c", "d" } }, _logger);
 
             Assert.Equal(2, request.Parameters.Count);
             var parameter = request.Parameters.TryFind("a");
@@ -201,7 +203,7 @@ namespace AWSRedrive.Tests.Unit
 
             var request = new RestRequest();
             processor.UnpackAttributesAsHeaders("not a json", request,
-                new ConfigurationEntry { UnpackAttributesAsHeaders = false });
+                new ConfigurationEntry { UnpackAttributesAsHeaders = false }, _logger);
 
             Assert.Empty(request.Parameters);
         }
@@ -213,7 +215,7 @@ namespace AWSRedrive.Tests.Unit
 
             var request = new RestRequest();
             processor.UnpackAttributesAsHeaders("not a json", request,
-                new ConfigurationEntry { UnpackAttributesAsHeaders = true });
+                new ConfigurationEntry { UnpackAttributesAsHeaders = true }, _logger);
         }
 
         [Fact]
@@ -223,7 +225,7 @@ namespace AWSRedrive.Tests.Unit
 
             var request = new RestRequest();
             processor.UnpackAttributesAsHeaders("{\"MessageAttributes\":{\"requestId\":{\"Value\":\"id\"},\"x-id\":{\"Value\":123}}}", request,
-                new ConfigurationEntry { UnpackAttributesAsHeaders = true });
+                new ConfigurationEntry { UnpackAttributesAsHeaders = true }, _logger);
 
             Assert.Equal(2, request.Parameters.Count);
 
