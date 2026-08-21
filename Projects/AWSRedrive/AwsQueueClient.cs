@@ -15,7 +15,7 @@ namespace AWSRedrive
     {
         public ConfigurationEntry ConfigurationEntry { get; set; }
 
-        protected IAmazonSQS _client;
+        protected IAmazonSQS Client;
 
         public void Init()
         {
@@ -41,12 +41,12 @@ namespace AWSRedrive
                 string.IsNullOrEmpty(ConfigurationEntry.SecretKey))
             {
                 // Configured profile or default profile.
-                _client = new AmazonSQSClient(config);
+                Client = new AmazonSQSClient(config);
             }
             else
             {
                 // Explicit credentials.
-                _client = new AmazonSQSClient(ConfigurationEntry.AccessKey,
+                Client = new AmazonSQSClient(ConfigurationEntry.AccessKey,
                     ConfigurationEntry.SecretKey,
                     config);
             }
@@ -72,7 +72,7 @@ namespace AWSRedrive
             {
                 try
                 {
-                    var response = await _client.ReceiveMessageAsync(request, source.Token);
+                    var response = await Client.ReceiveMessageAsync(request, source.Token);
                     if (response?.Messages?.Count >= 1)
                     {
                         var message = response.Messages[0];
@@ -108,10 +108,10 @@ namespace AWSRedrive
 
         public void DeleteMessage(IMessage message)
         {
-            DeleteMessageInternalAsync(message);
+            DeleteMessageInternalAsync(message).GetAwaiter().GetResult();
         }
 
-        private async void DeleteMessageInternalAsync(IMessage message)
+        private async Task DeleteMessageInternalAsync(IMessage message)
         {
             var request = new DeleteMessageRequest
             {
@@ -121,7 +121,7 @@ namespace AWSRedrive
 
             using (var source = new CancellationTokenSource(20 * 1000))
             {
-                await _client.DeleteMessageAsync(request, source.Token);
+                await Client.DeleteMessageAsync(request, source.Token);
             }
         }
 
@@ -142,12 +142,12 @@ namespace AWSRedrive
             var request = new GetQueueAttributesRequest
             {
                 QueueUrl = ConfigurationEntry.QueueUrl,
-                AttributeNames = new List<string> { "RedrivePolicy" }
+                AttributeNames = ["RedrivePolicy"]
             };
 
             using (var source = new CancellationTokenSource(10 * 1000))
             {
-                var response = await _client.GetQueueAttributesAsync(request, source.Token);
+                var response = await Client.GetQueueAttributesAsync(request, source.Token);
                 
                 if (response.Attributes == null || 
                     !response.Attributes.TryGetValue("RedrivePolicy", out var policy) ||
@@ -193,7 +193,7 @@ namespace AWSRedrive
         {
             if (disposing)
             {
-                _client?.Dispose();
+                Client?.Dispose();
             }
         }
     }
