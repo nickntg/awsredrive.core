@@ -73,6 +73,7 @@ $sinkPort = Get-DotEnvValue -Name 'SINK_HTTP_PORT'          -Default '8080'
 $sinkTlsPort = Get-DotEnvValue -Name 'SINK_HTTPS_PORT'      -Default '8443'
 $kafkaPort = Get-DotEnvValue -Name 'KAFKA_PORT'             -Default '29092'
 $dashPort = Get-DotEnvValue -Name 'REDRIVE_DASHBOARD_PORT'  -Default '5000'
+$dozzlePort = Get-DotEnvValue -Name 'DOZZLE_PORT'           -Default '9999'
 
 # --------------------------------------------------------------------------
 # Preconditions
@@ -172,6 +173,12 @@ if (-not (Wait-ForHttp -Name 'redrive' -Url "http://localhost:$dashPort/health" 
     Fail "Redrive did not become healthy."
 }
 
+# Dozzle is a convenience, not a dependency - the tests never touch it, so a
+# slow or unhappy log viewer must not stop a run.
+if (-not (Wait-ForHttp -Name 'dozzle' -Url "http://localhost:$dozzlePort/healthcheck" -Timeout 20)) {
+    Write-Host "  (log viewer did not answer - the stack is still usable)" -ForegroundColor Yellow
+}
+
 # --------------------------------------------------------------------------
 # Report
 # --------------------------------------------------------------------------
@@ -183,6 +190,7 @@ Write-Host "  Kafka (external)   localhost:$kafkaPort"
 Write-Host "  Sink (HTTP)        http://localhost:$sinkPort"
 Write-Host "  Sink (HTTPS)       https://localhost:$sinkTlsPort"
 Write-Host "  Redrive dashboard  http://localhost:$dashPort"
+Write-Host "  Logs (Dozzle)      http://localhost:$dozzlePort" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Run the tests from Visual Studio, or:" -ForegroundColor Cyan
 Write-Host "  dotnet test Tests/AWSRedrive.Test.Integration"

@@ -126,6 +126,28 @@ services:
       - ./redrive/appsettings.json:/app/appsettings.json:ro
       - ./redrive/NLog.config:/app/NLog.config:ro
 
+  # ------------------------------------------------------------------------
+  # Log viewer. Not part of the system under test - purely so the stack's logs
+  # can be read in a browser instead of `docker compose logs`.
+  # ------------------------------------------------------------------------
+  dozzle:
+    image: ${DOZZLE_IMAGE}
+    container_name: awsredrive-it-dozzle
+    ports:
+      - "${DOZZLE_PORT}:8080"
+    environment:
+      # Show only this stack's containers. Compose stamps this label on every
+      # service it creates, so an unrelated container on the same daemon stays
+      # out of the way.
+      DOZZLE_FILTER: label=com.docker.compose.project=awsredrive-it
+      DOZZLE_NO_ANALYTICS: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - dozzle_data:/data
+
+volumes:
+  dozzle_data:
+
 networks:
   default:
     name: awsredrive-it

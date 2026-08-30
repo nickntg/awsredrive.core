@@ -24,6 +24,7 @@ fails with a single sentence pointing at `start.ps1` if nothing answers.
 | `kafka` | localhost:29092 | Redrive's Kafka destination. |
 | `sink` | http://localhost:8080, https://localhost:8443 | Records every delivery and serves it back to tests. |
 | `redrive` | http://localhost:5000 | The system under test, and its dashboard. |
+| `dozzle` | http://localhost:9999 | Web log viewer for the stack. Not part of the system under test. |
 
 `floci-init` and `kafka-init` are one-shot containers that create the queues and
 topics, then exit. They are the readiness gate — `redrive` waits for both, plus a
@@ -42,6 +43,11 @@ curl.exe -s http://localhost:8080/recorded/<guid>  # one correlation id
 curl.exe -s http://localhost:5000/api/status       # redrive's own view
 docker compose logs -f redrive
 ```
+
+Or open <http://localhost:9999> for the same logs in a browser — Dozzle, live
+tailing every container in the stack. It is filtered to this compose project, so
+unrelated containers on the same daemon do not show up, and nothing in the test
+suite depends on it: if it fails to start, `start.ps1` warns and carries on.
 
 ## How the tests stay isolated
 
