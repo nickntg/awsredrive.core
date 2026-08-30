@@ -23,8 +23,33 @@ param(
     [int]$TimeoutSeconds = 180
 )
 
-$ErrorActionPreference = 'Stop'
+# Deliberately NOT 'Stop'. Native executables write progress and warnings to
+# stderr - `docker info` emits "WARNING: No blkio throttle.read_bps_device
+# support", `docker compose up` writes its whole progress display there. Under
+# 'Stop', Windows PowerShell wraps each of those lines in a NativeCommandError
+# and kills the script. Exit codes are checked explicitly instead, and Fail is
+# used for anything genuinely fatal.
+$ErrorActionPreference = 'Continue'
 Set-Location -Path $PSScriptRoot
+
+function Fail {
+    param([string]$Message)
+
+    Write-Host ""
+    Write-Host $Message -ForegroundColor Red
+    exit 1
+}
+
+<#
+.SYNOPSIS
+    Runs docker, swallowing its output, and returns whether it succeeded.
+#>
+function Invoke-DockerQuiet {
+    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$DockerArgs)
+
+    $null = & docker @DockerArgs 2>&1
+    return ($LASTEXITCODE -eq 0)
+}
 
 # --------------------------------------------------------------------------
 # Settings, read from .env so the ports live in exactly one place
@@ -53,12 +78,11 @@ $dashPort = Get-DotEnvValue -Name 'REDRIVE_DASHBOARD_PORT'  -Default '5000'
 # Preconditions
 # --------------------------------------------------------------------------
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Write-Error "docker was not found on PATH. Install Docker Desktop and try again."
+    Fail "docker was not found on PATH. Install Docker Desktop and try again."
 }
 
-docker info 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "The Docker daemon is not responding. Start Docker Desktop and try again."
+if (-not (Invoke-DockerQuiet info)) {
+    Fail "The Docker daemon is not responding. Start Docker Desktop and try again."
 }
 
 $env:COMPOSE_PROJECT_NAME = 'awsredrive-it'
@@ -93,23 +117,23 @@ function Wait-ForInitContainer {
     Write-Host -NoNewline "  waiting for $Service to complete ... "
     $deadline = (Get-Date).AddSeconds($Timeout)
     while ((Get-Date) -lt $deadline) {
-        $id = (docker compose ps -a -q $Service)
+        $id = (& docker compose ps -a -q $Service 2>$null | Select-Object -First 1)
         if ($id) {
-            $state = docker inspect -f '{{.State.Status}}:{{.State.ExitCode}}' $id 2>$null
+            $state = (& docker inspect -f '{{.State.Status}}:{{.State.ExitCode}}' $id 2>$null | Select-Object -First 1)
             if ($state -eq 'exited:0') {
                 Write-Host "ok" -ForegroundColor Green
                 return $true
             }
             if ($state -like 'exited:*') {
                 Write-Host "FAILED ($state)" -ForegroundColor Red
-                docker compose logs $Service
+                & docker compose logs $Service
                 return $false
             }
         }
         Start-Sleep -Milliseconds 700
     }
     Write-Host "TIMEOUT" -ForegroundColor Red
-    docker compose logs $Service
+    & docker compose logs $Service
     return $false
 }
 
@@ -123,29 +147,29 @@ if (-not $NoBuild) { $upArgs += '--build' }
 
 & docker @upArgs
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "docker compose up failed."
+    Fail "docker compose up failed."
 }
 
 Write-Host ""
 
 if (-not (Wait-ForInitContainer -Service 'floci-init' -Timeout $TimeoutSeconds)) {
-    docker compose logs floci
-    Write-Error "Queue seeding did not complete. Floci may not have started."
+    & docker compose logs floci
+    Fail "Queue seeding did not complete. Floci may not have started."
 }
 
 if (-not (Wait-ForInitContainer -Service 'kafka-init' -Timeout $TimeoutSeconds)) {
-    docker compose logs kafka
-    Write-Error "Kafka topic creation did not complete."
+    & docker compose logs kafka
+    Fail "Kafka topic creation did not complete."
 }
 
 if (-not (Wait-ForHttp -Name 'sink' -Url "http://localhost:$sinkPort/health" -Timeout $TimeoutSeconds)) {
-    docker compose logs sink
-    Write-Error "The sink service did not become healthy."
+    & docker compose logs sink
+    Fail "The sink service did not become healthy."
 }
 
 if (-not (Wait-ForHttp -Name 'redrive' -Url "http://localhost:$dashPort/health" -Timeout $TimeoutSeconds)) {
-    docker compose logs redrive
-    Write-Error "Redrive did not become healthy."
+    & docker compose logs redrive
+    Fail "Redrive did not become healthy."
 }
 
 # --------------------------------------------------------------------------

@@ -23,11 +23,15 @@ param(
     [switch]$All
 )
 
-$ErrorActionPreference = 'Stop'
+# Deliberately NOT 'Stop' - see the note in start.ps1. `docker compose down`
+# writes its progress display to stderr, which Windows PowerShell would turn
+# into a terminating NativeCommandError.
+$ErrorActionPreference = 'Continue'
 Set-Location -Path $PSScriptRoot
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Write-Error "docker was not found on PATH."
+    Write-Host "docker was not found on PATH." -ForegroundColor Red
+    exit 1
 }
 
 $env:COMPOSE_PROJECT_NAME = 'awsredrive-it'
