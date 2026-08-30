@@ -1,4 +1,7 @@
 services:
+  # ------------------------------------------------------------------------
+  # SQS emulator. Tests send messages here; redrive polls it.
+  # ------------------------------------------------------------------------
   floci:
     image: ${FLOCI_IMAGE}
     container_name: awsredrive-it-floci
@@ -7,6 +10,8 @@ services:
     environment:
       FLOCI_STORAGE_MODE: memory
 
+  # One-shot. Its retry loop is the readiness gate for Floci - the image is a
+  # Quarkus native build with no shell, so it cannot run a compose healthcheck.
   floci-init:
     image: ${AWSCLI_IMAGE}
     container_name: awsredrive-it-floci-init
@@ -18,6 +23,108 @@ services:
       AWS_REGION: ${AWS_REGION}
     volumes:
       - ./floci/seed.sh:/seed/seed.sh:ro
+
+  # ------------------------------------------------------------------------
+  # Kafka, single node in KRaft mode. Redrive's Kafka destination.
+  # ------------------------------------------------------------------------
+  kafka:
+    image: ${KAFKA_IMAGE}
+    container_name: awsredrive-it-kafka
+    ports:
+      - "${KAFKA_PORT}:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: 5L6g3nShT-eMCtK--X86sw
+
+  # One-shot. Creates the test topics so the sink can subscribe at startup
+  # rather than depending on auto-creation timing.
+  kafka-init:
+    image: ${KAFKA_IMAGE}
+    container_name: awsredrive-it-kafka-init
+    depends_on:
+      - kafka
+    entrypoint: ["/bin/sh", "/seed/seed.sh"]
+    volumes:
+      - ./kafka/seed.sh:/seed/seed.sh:ro
+
+  # ------------------------------------------------------------------------
+  # Recording sink. Redrive's HTTP destination, the Kafka topic consumer, and
+  # the query surface the tests assert against.
+  # ------------------------------------------------------------------------
+  sink:
+    build:
+      context: .
+      dockerfile: sink/Dockerfile
+    container_name: awsredrive-it-sink
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    ports:
+      - "${SINK_HTTP_PORT}:8080"
+      - "${SINK_HTTPS_PORT}:8443"
+    environment:
+      SINK_HTTP_PORT: 8080
+      SINK_HTTPS_PORT: 8443
+      EXPECTED_AUTH_TOKEN: ${EXPECTED_AUTH_TOKEN}
+      EXPECTED_API_KEY: ${EXPECTED_API_KEY}
+      EXPECTED_BASIC_USER: ${EXPECTED_BASIC_USER}
+      EXPECTED_BASIC_PASSWORD: ${EXPECTED_BASIC_PASSWORD}
+      KAFKA_BOOTSTRAP: kafka:9092
+      KAFKA_TOPICS: it-kafka-plain,it-kafka-compressed
+      REDRIVE_CONFIG_PATH: /redrive-config/config.json
+    volumes:
+      # Read-write, and shared with redrive: this is how the reload tests change
+      # redrive's configuration without touching the host filesystem themselves.
+      - ./redrive/config.json:/redrive-config/config.json
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # ------------------------------------------------------------------------
+  # The system under test.
+  # ------------------------------------------------------------------------
+  redrive:
+    build:
+      context: ..
+      dockerfile: Dockerfile.image
+      target: console-image
+    container_name: awsredrive-it-redrive
+    depends_on:
+      floci-init:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+      sink:
+        condition: service_healthy
+    ports:
+      - "${REDRIVE_DASHBOARD_PORT}:5000"
+    environment:
+      # AwsQueueClient sets ServiceURL *or* RegionEndpoint, never both, so the
+      # alias Region is ignored once ServiceUrl is set. The SDK still wants a
+      # region for request signing.
+      AWS_REGION: ${AWS_REGION}
+      AWS_DEFAULT_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    volumes:
+      # Not :ro - the sink rewrites this file for the reload tests.
+      - ./redrive/config.json:/app/config.json
+      - ./redrive/appsettings.json:/app/appsettings.json:ro
+      - ./redrive/NLog.config:/app/NLog.config:ro
 
 networks:
   default:
