@@ -209,6 +209,23 @@ make image-push DOCKER_REGISTRY=ghcr.io/user DOCKER_TAG=1.0.0
 | `BUILD_RUNTIME` | linux-x64 | Target for docker-build-* commands |
 | `CONFIG` | Release | Build configuration |
 
+### Integration Tests
+
+The integration suite runs against a Docker stack: an SQS emulator, Kafka, a
+recording sink service and AWSRedrive itself. Bring the stack up first, then run
+the tests from Visual Studio or the CLI.
+
+```powershell
+cd integration-infrastructure
+./start.ps1
+dotnet test Tests/AWSRedrive.Test.Integration
+./stop.ps1
+```
+
+The test project has no Docker dependency of its own; it talks to fixed host
+ports. See `integration-infrastructure/README.md` for the port table and how the
+28 tests stay isolated from each other.
+
 ## Running with Docker
 
 ```bash
