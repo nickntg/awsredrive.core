@@ -166,6 +166,30 @@
     "LogLevel": "Debug"
   },
   {
+    "Alias": "it-activatable",
+    "QueueUrl": "http://floci:4566/000000000000/it-activatable",
+    "ServiceUrl": "http://floci:4566",
+    "Region": "us-east-1",
+    "AccessKey": "test",
+    "SecretKey": "test",
+    "RedriveUrl": "http://sink:8080/http/activatable",
+    "Active": false,
+    "Timeout": 10000,
+    "LogLevel": "Debug"
+  },
+  {
+    "Alias": "it-removable",
+    "QueueUrl": "http://floci:4566/000000000000/it-removable",
+    "ServiceUrl": "http://floci:4566",
+    "Region": "us-east-1",
+    "AccessKey": "test",
+    "SecretKey": "test",
+    "RedriveUrl": "http://sink:8080/http/removable",
+    "Active": true,
+    "Timeout": 10000,
+    "LogLevel": "Debug"
+  },
+  {
     "Alias": "it-kafka-plain",
     "QueueUrl": "http://floci:4566/000000000000/it-kafka-plain",
     "ServiceUrl": "http://floci:4566",

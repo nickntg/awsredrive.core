@@ -9,6 +9,12 @@ namespace AWSRedrive.Test.Integration;
 /// ConfigurationChangeManager reconciles the running processors against it.
 /// These tests change the configuration through the sink's admin endpoint and
 /// wait for that loop to come around, so they are the slowest in the suite.
+///
+/// Each test owns an alias nothing else touches - it-inactive, it-activatable,
+/// it-reload, it-removable. Restoring the baseline in teardown does not take
+/// effect for up to another 60 seconds, so a test that mutated a shared alias
+/// would leave the next one running against a configuration redrive has not
+/// caught up with yet.
 /// </summary>
 [Collection(IntegrationCollection.Name)]
 [Trait("Speed", "Slow")]
@@ -42,15 +48,17 @@ public class ConfigurationReloadTests : IntegrationTest, IAsyncLifetime
     {
         var correlation = NewCorrelation();
 
-        await Queues.SendAsync("it-inactive", JsonBody(correlation));
+        // it-activatable, not it-inactive: this test leaves the alias active until
+        // the baseline restore reconciles, which would break the test above.
+        await Queues.SendAsync("it-activatable", JsonBody(correlation));
 
         var config = await Sink.GetConfigAsync();
-        FindAlias(config, "it-inactive")["Active"] = true;
+        FindAlias(config, "it-activatable")["Active"] = true;
         await Sink.SetConfigAsync(config);
 
         var records = await Sink.WaitForDeliveryAsync(correlation, ReloadBudget);
 
-        Assert.Equal("/http/inactive", records[0].Path);
+        Assert.Equal("/http/activatable", records[0].Path);
     }
 
     [Fact]
@@ -88,17 +96,20 @@ public class ConfigurationReloadTests : IntegrationTest, IAsyncLifetime
     [Fact]
     public async Task RemovingAnAliasStopsItsProcessor()
     {
-        // Prove the alias is live before removing it, so a failure here cannot be
+        // it-removable exists only for this test - removing an alias that another
+        // test uses would break it for the up-to-60s the restore takes to land.
+        //
+        // Prove the alias is live before removing it, so a failure below cannot be
         // mistaken for the alias having been broken all along.
         var before = NewCorrelation();
-        await Queues.SendAsync("it-http-put", JsonBody(before));
+        await Queues.SendAsync("it-removable", JsonBody(before));
         await Sink.WaitForDeliveryAsync(before);
 
         var config = await Sink.GetConfigAsync();
         var remaining = new JsonArray();
         foreach (var entry in config.OfType<JsonObject>())
         {
-            if ((string?)entry["Alias"] == "it-http-put")
+            if ((string?)entry["Alias"] == "it-removable")
             {
                 continue;
             }
@@ -112,7 +123,7 @@ public class ConfigurationReloadTests : IntegrationTest, IAsyncLifetime
         await Task.Delay(TimeSpan.FromSeconds(75));
 
         var after = NewCorrelation();
-        await Queues.SendAsync("it-http-put", JsonBody(after));
+        await Queues.SendAsync("it-removable", JsonBody(after));
         await Sink.AssertNoDeliveryAsync(after, TimeSpan.FromSeconds(30));
     }
 }

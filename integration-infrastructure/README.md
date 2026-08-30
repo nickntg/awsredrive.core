@@ -48,7 +48,7 @@ docker compose logs -f redrive
 Redrive reads `config.json` from disk and the `Orchestrator` only re-reads it
 once a minute, so per-test configuration would cost a minute per test. Instead:
 
-- **Aliases are keyed by configuration shape, not by test.** The 15 aliases in
+- **Aliases are keyed by configuration shape, not by test.** The 17 aliases in
   `redrive/config.json` cover every combination redrive supports — the four
   verbs, the three authentication modes, TLS with and without certificate
   validation, both Kafka variants, and an inactive entry. Several tests share an
@@ -58,6 +58,13 @@ once a minute, so per-test configuration would cost a minute per test. Instead:
   `X-Correlation-Id` header, a `correlation` JSON field, or a `correlation` query
   parameter. That last one is what covers `UseGET`, where redrive unwraps the
   body into query parameters and sends no body at all.
+
+The configuration-reload tests are the exception: each owns an alias nothing
+else touches (`it-inactive`, `it-activatable`, `it-removable`, and `it-reload`,
+which has a queue but no alias until a test adds one). Restoring the baseline in
+teardown does not reach redrive for up to another 60 seconds, so a reload test
+that mutated a shared alias would leave the next test running against a
+configuration redrive has not caught up with yet.
 
 Failure-path queues (`it-timeout`, `it-failing`, `it-https-strict`) have a
 5 second visibility timeout and their own dead letter queue, so rejected
@@ -95,6 +102,11 @@ docker compose restart redrive
 
 Adding an alias also means adding its queue to `floci/seed.sh`, which needs a
 full `./stop.ps1; ./start.ps1` — Floci holds queues in memory.
+
+Note that `DELETE /admin/redrive-config` restores the copy of `config.json` that
+was baked into the sink image when it was built, not whatever is on disk now. If
+you edit the file, rebuild the sink (`./start.ps1`, or
+`docker compose build sink`) so the reload tests restore what you expect.
 
 ## Design and plan
 

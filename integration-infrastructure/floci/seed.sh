@@ -53,7 +53,8 @@ ATTRS
 echo "Creating queues..."
 for q in it-http-post it-http-put it-http-delete it-http-get \
          it-auth-token it-gateway-token it-basic-auth it-sns-unpack \
-         it-inactive it-kafka-plain it-kafka-compressed it-reload; do
+         it-https-lax it-inactive it-activatable it-removable it-reload \
+         it-kafka-plain it-kafka-compressed; do
   create_plain "$q"
 done
 
