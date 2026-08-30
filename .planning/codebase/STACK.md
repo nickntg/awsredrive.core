@@ -38,11 +38,14 @@
 
 **Testing:**
 - xUnit 2.9.2 (+ `xunit.runner.visualstudio` 2.8.2) - `Tests/AWSRedrive.Tests.Unit`, `Tests/AWSRedrive.Test.Integration`
-- FakeItEasy 8.3.0 - mocking library used throughout `Tests/AWSRedrive.Tests.Unit/*.cs`
+- FakeItEasy 8.3.0 - mocking library used throughout `Tests/AWSRedrive.Tests.Unit/*.cs`; deliberately absent from the integration project
 - Microsoft.NET.Test.Sdk 17.11.1
+- AWSSDK.SQS 4.0.3.7 - also referenced by `Tests/AWSRedrive.Test.Integration` so tests can drive the emulated queues directly
+- Integration stack (`integration-infrastructure/`, not part of the shipped product): Floci (`floci/floci`) as an SQS emulator, Apache Kafka 3.9 in KRaft mode, a Python 3.12 / FastAPI recording sink with `confluent-kafka`, Dozzle for log browsing, and the redrive image itself built from `Dockerfile.image`. Orchestrated by `docker-compose.yml` and driven from `start.ps1` / `stop.ps1` — never from the test process.
 
 **Build/Dev:**
-- `dotnet` CLI (build/test/publish) orchestrated via `Makefile` (targets: `run`, `watch`, `test`, `console`, `service`, `all`, `docker-*`, `image`, `sign`)
+- `dotnet` CLI (build/test/publish) orchestrated via `Makefile` (targets: `run`, `watch`, `test`, `console`, `service`, `all`, `docker-*`, `image`, `sign`, `integration-up`, `integration-down`, `integration-test`, `integration-test-fast`)
+- PowerShell 5.1+ - `integration-infrastructure/start.ps1` and `stop.ps1`. Both run at `$ErrorActionPreference = 'Continue'` on purpose: Windows PowerShell turns a native executable's stderr into a terminating `NativeCommandError` under `'Stop'`, and docker writes both warnings and progress there.
 - Docker multi-stage builds - `Dockerfile` (scratch-based, artifact extraction) and `Dockerfile.image` (runnable container image, `mcr.microsoft.com/dotnet/runtime-deps:8.0-noble-chiseled` base)
 - SonarQube integration - `Tests/AWSRedrive.Tests.Unit/AWSRedrive.Tests.Unit.csproj` sets `SonarQubeTestProject=true`; `.gitignore` excludes `.sonarqube/` and `sonar*.*`
 

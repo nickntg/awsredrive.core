@@ -324,3 +324,40 @@ The combination is deliberately never exercised.
 - No CI wiring. The repository has no `.github/workflows`, and adding one is a separate
   decision.
 - No changes to the unit test project.
+
+---
+
+## Changes During Implementation
+
+This document is the design as agreed before any code was written. It was not
+rewritten afterwards — the following is what actually shipped where it differs.
+For the current state, `integration-infrastructure/README.md` is authoritative.
+
+**Seven services, not five.** `kafka-init` was added so the test topics exist
+before the sink subscribes, rather than relying on Kafka's auto-creation timing.
+`dozzle` was added on request, as a web log viewer for the stack; it is on host
+port 9999, filtered to this compose project, and nothing in the suite depends on
+it.
+
+**Seventeen aliases, not sixteen.** Two were added during a review pass so that
+no two configuration-reload tests, and no reload test and verb test, can contend
+for the same alias while redrive's 60-second reconciliation loop catches up:
+`it-activatable` (inactive, activated by one test) and `it-removable` (active,
+removed by another). The design had those two tests mutating `it-inactive` and
+`it-http-put`, which other tests also use — a real source of flakiness.
+
+**`it-https-lax` had no queue.** The alias was specified but the queue was
+missing from this document's seed list, and from the implementation plan. Caught
+by a cross-check of `config.json` against `floci/seed.sh`, which is now part of
+the verification routine.
+
+**PowerShell stderr handling.** Both scripts run at
+`$ErrorActionPreference = 'Continue'`, not `'Stop'`. Windows PowerShell wraps
+every stderr line from a native executable in a `NativeCommandError`, which under
+`'Stop'` is terminating — and `docker info` emits a warning while
+`docker compose up` writes its entire progress display to stderr. Exit codes are
+checked explicitly instead.
+
+**Nine slow tests, not eight.** `TlsTests.WithoutIgnoreCertificateErrors...`
+carries the trait at method level, so `--filter "Speed!=Slow"` selects 19 of 28.
+Class-level traits do filter, which this document left as an open question.
