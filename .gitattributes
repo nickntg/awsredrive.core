@@ -1,0 +1,8 @@
+# Shell scripts and files consumed inside Linux containers must keep LF endings,
+# regardless of core.autocrlf on the developer's machine.
+*.sh text eol=lf
+integration-infrastructure/**/Dockerfile text eol=lf
+integration-infrastructure/**/*.py text eol=lf
+integration-infrastructure/**/*.yml text eol=lf
+integration-infrastructure/redrive/*.json text eol=lf
+integration-infrastructure/redrive/NLog.config text eol=lf

@@ -1,0 +1,24 @@
+services:
+  floci:
+    image: ${FLOCI_IMAGE}
+    container_name: awsredrive-it-floci
+    ports:
+      - "${FLOCI_PORT}:4566"
+    environment:
+      FLOCI_STORAGE_MODE: memory
+
+  floci-init:
+    image: ${AWSCLI_IMAGE}
+    container_name: awsredrive-it-floci-init
+    depends_on:
+      - floci
+    entrypoint: ["/bin/sh", "/seed/seed.sh"]
+    environment:
+      AWS_ACCOUNT_ID: ${AWS_ACCOUNT_ID}
+      AWS_REGION: ${AWS_REGION}
+    volumes:
+      - ./floci/seed.sh:/seed/seed.sh:ro
+
+networks:
+  default:
+    name: awsredrive-it
