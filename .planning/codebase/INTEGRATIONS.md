@@ -64,7 +64,7 @@
 ## CI/CD & Deployment
 
 **Hosting:**
-- Self-hosted: runs as a Linux systemd service (`AWSRedrive.LinuxService`) or standalone console process (`AWSRedrive.console`), or as a Docker container built from `Dockerfile.image` (base image `mcr.microsoft.com/dotnet/runtime-deps:8.0-noble-chiseled`, exposing port 5000)
+- Self-hosted: runs as a Linux systemd service (`AWSRedrive.LinuxService`) or standalone console process (`AWSRedrive.console`), or as a Docker container built from `Dockerfile.image` (base image `mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled`, exposing port 5000)
 - No cloud platform (AWS ECS/Lambda/etc.) deployment config found in-repo; AWS is used only as an SQS client, not as a hosting target
 
 **CI Pipeline:**

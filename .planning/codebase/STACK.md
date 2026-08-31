@@ -5,7 +5,7 @@
 ## Languages
 
 **Primary:**
-- C# 12 (implicit, via `net8.0` TargetFramework) - all production code in `Projects/AWSRedrive`, `Projects/AWSRedrive.console`, `Projects/AWSRedrive.LinuxService`
+- C# 14 (implicit, via `net10.0` TargetFramework) - all production code in `Projects/AWSRedrive`, `Projects/AWSRedrive.console`, `Projects/AWSRedrive.LinuxService`
 - PowerShell (consumed, not authored, by the app) - `Projects/AWSRedrive/PowershellMessageProcessor.cs` executes user-supplied `.ps1` redrive scripts via `System.Management.Automation`
 
 **Secondary:**
@@ -17,7 +17,7 @@
 ## Runtime
 
 **Environment:**
-- .NET 8.0 (`net8.0` target framework across all projects)
+- .NET 10.0 (`net10.0` target framework across all projects)
 - `Projects/AWSRedrive/AWSRedrive.csproj` (class library, core logic)
 - `Projects/AWSRedrive.console/AWSRedrive.console.csproj` (console host, `OutputType=Exe`)
 - `Projects/AWSRedrive.LinuxService/AWSRedrive.LinuxService.csproj` (Worker Service SDK, `Microsoft.NET.Sdk.Worker`, runs as systemd service via `Microsoft.Extensions.Hosting.Systemd`)
@@ -46,7 +46,7 @@
 **Build/Dev:**
 - `dotnet` CLI (build/test/publish) orchestrated via `Makefile` (targets: `run`, `watch`, `test`, `console`, `service`, `all`, `docker-*`, `image`, `sign`, `integration-up`, `integration-down`, `integration-test`, `integration-test-fast`)
 - PowerShell 5.1+ - `integration-infrastructure/start.ps1` and `stop.ps1`. Both run at `$ErrorActionPreference = 'Continue'` on purpose: Windows PowerShell turns a native executable's stderr into a terminating `NativeCommandError` under `'Stop'`, and docker writes both warnings and progress there.
-- Docker multi-stage builds - `Dockerfile` (scratch-based, artifact extraction) and `Dockerfile.image` (runnable container image, `mcr.microsoft.com/dotnet/runtime-deps:8.0-noble-chiseled` base)
+- Docker multi-stage builds - `Dockerfile` (scratch-based, artifact extraction) and `Dockerfile.image` (runnable container image, `mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled` base)
 - SonarQube integration - `Tests/AWSRedrive.Tests.Unit/AWSRedrive.Tests.Unit.csproj` sets `SonarQubeTestProject=true`; `.gitignore` excludes `.sonarqube/` and `sonar*.*`
 
 ## Key Dependencies
@@ -81,7 +81,7 @@
 ## Platform Requirements
 
 **Development:**
-- .NET 8 SDK (`mcr.microsoft.com/dotnet/sdk:8.0` used in Docker build stages)
+- .NET 10 SDK (`mcr.microsoft.com/dotnet/sdk:10.0` used in Docker build stages)
 - `make` (GNU Make) for the convenience build/test/docker targets in `Makefile`
 - Docker (optional, for cross-platform/reproducible builds and containerized runs)
 - macOS-specific `sign` target in `Makefile` for code-signing local builds (Apple codesign, unrelated to core runtime deps)
@@ -90,7 +90,7 @@
 - Self-contained single-file binaries deployed per-platform (`linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`, `win-x64`)
 - Linux: runs as a systemd-managed background service (`AWSRedrive.LinuxService`, uses `Microsoft.Extensions.Hosting.Systemd`)
 - Any platform: runs as a foreground console app (`AWSRedrive.console`) with Ctrl+C / process-exit graceful shutdown
-- Container images published via `Dockerfile.image`, based on `mcr.microsoft.com/dotnet/runtime-deps:8.0-noble-chiseled` (minimal/chiseled Ubuntu Noble), exposing port 5000 for the embedded dashboard
+- Container images published via `Dockerfile.image`, based on `mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled` (minimal/chiseled Ubuntu Noble), exposing port 5000 for the embedded dashboard
 
 ---
 

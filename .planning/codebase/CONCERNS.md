@@ -123,7 +123,7 @@
 
 **`System.Management.Automation` (PowerShell SDK) dependency for `RedriveScript`:**
 - Risk: Embedding the PowerShell hosting API ties the console/service binaries to a specific PowerShell SDK version and platform behavior; cross-platform (Linux) PowerShell scripting support can have subtle differences from Windows PowerShell, and this is one of only three redrive mechanisms (HTTP, PowerShell, Kafka) with no fallback if the hosting API has compatibility issues on newer .NET/OS combinations.
-- Impact: Any breaking change in the PowerShell SDK across .NET version bumps (project currently targets .NET 8 in `Dockerfile`) could silently break all `RedriveScript`-configured queues at runtime rather than compile time, since script execution failures manifest as `InvalidOperationException` at message-processing time.
+- Impact: Any breaking change in the PowerShell SDK across .NET version bumps (project currently targets .NET 10 in `Dockerfile`) could silently break all `RedriveScript`-configured queues at runtime rather than compile time, since script execution failures manifest as `InvalidOperationException` at message-processing time.
 - Migration plan: None currently documented; worth periodically validating PowerShell SDK compatibility when bumping the target framework in Docker/csproj files.
 
 ## Missing Critical Features

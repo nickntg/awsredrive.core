@@ -21,7 +21,7 @@ DOCKER_TAG ?= latest
 FULL_IMAGE = $(if $(DOCKER_REGISTRY),$(DOCKER_REGISTRY)/$(DOCKER_IMAGE),$(DOCKER_IMAGE))
 
 # Docker SDK build settings
-SDK_IMAGE ?= mcr.microsoft.com/dotnet/sdk:8.0
+SDK_IMAGE ?= mcr.microsoft.com/dotnet/sdk:10.0
 BUILD_RUNTIME ?= linux-x64
 
 # Projects
@@ -48,12 +48,12 @@ run:
 watch:
 	cd Projects/AWSRedrive.console && dotnet watch run -c Debug
 test:
-	dotnet test $(TESTS) -c Debug
+	dotnet test --project $(TESTS) -c Debug
 test-watch:
 	dotnet watch test --project $(TESTS)
 logs:
-	tail -f Projects/AWSRedrive.console/bin/Debug/net8.0/logs/awsredrive.log 2>/dev/null | jq . || \
-	tail -f Projects/AWSRedrive.console/bin/Debug/net8.0/logs/awsredrive.log
+	tail -f Projects/AWSRedrive.console/bin/Debug/net10.0/logs/awsredrive.log 2>/dev/null | jq . || \
+	tail -f Projects/AWSRedrive.console/bin/Debug/net10.0/logs/awsredrive.log
 
 # Build (local .NET SDK)
 console: test
@@ -91,7 +91,7 @@ docker-build-all-quick: docker-build-console-quick docker-build-service-quick
 
 docker-test:
 	docker run --rm -v $(PWD):/src -w /src $(SDK_IMAGE) \
-		dotnet test $(TESTS) -c Debug
+		dotnet test --project $(TESTS) -c Debug
 
 # macOS signing
 sign:
@@ -121,9 +121,9 @@ integration-up:
 integration-down:
 	pwsh -File integration-infrastructure/stop.ps1
 integration-test:
-	dotnet test $(INTEGRATION) -c Debug
+	dotnet test --project $(INTEGRATION) -c Debug
 integration-test-fast:
-	dotnet test $(INTEGRATION) -c Debug --filter "Speed!=Slow"
+	dotnet test --project $(INTEGRATION) -c Debug --filter-not-trait "Speed=Slow"
 
 # Clean
 clean:

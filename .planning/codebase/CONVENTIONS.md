@@ -32,7 +32,7 @@
 - No linter (ESLint/StyleCop/Roslyn analyzers) configured in `.csproj` files.
 
 **Language features:**
-- Target framework: `net8.0` for all projects (`Projects/AWSRedrive/AWSRedrive.csproj`, `Tests/AWSRedrive.Tests.Unit/AWSRedrive.Tests.Unit.csproj`).
+- Target framework: `net10.0` for all projects (`Projects/AWSRedrive/AWSRedrive.csproj`, `Tests/AWSRedrive.Tests.Unit/AWSRedrive.Tests.Unit.csproj`).
 - C# collection expressions used where terse: `private readonly string[] _ignoredHeaders = ["content-length", "host", ...];` (`Projects/AWSRedrive/HttpMessageProcessor.cs:16`).
 - Nested ternaries used for simple branching logic: `configurationEntry.UseGET ? "GET" : configurationEntry.UsePUT ? "PUT" : ... : "POST"` (`Projects/AWSRedrive/HttpMessageProcessor.cs:21`).
 - `var` used pervasively for local variable declarations.

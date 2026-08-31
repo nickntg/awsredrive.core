@@ -5,24 +5,28 @@
 ## Test Framework
 
 **Runner:**
-- xUnit 2.9.2 (`xunit` + `xunit.runner.visualstudio` 2.8.2 packages) in both test projects.
+- xUnit v3 4.0.0 (`xunit.v3` package) in both test projects, running on Microsoft.Testing.Platform (MTP).
 - Config: no custom `xunit.runner.json`; defaults are used. Project config: `Tests/AWSRedrive.Tests.Unit/AWSRedrive.Tests.Unit.csproj`, `Tests/AWSRedrive.Test.Integration/AWSRedrive.Test.Integration.csproj`.
-- Both test projects target `net8.0` and reference `Microsoft.NET.Test.Sdk` 17.11.1.
+- Both test projects target `net10.0` and set `OutputType=Exe` — a v3 test project is a self-hosting executable, not a library loaded by an external runner.
+- There is no `Microsoft.NET.Test.Sdk` or `xunit.runner.visualstudio` reference. Both exist only to host tests under VSTest, which the .NET 10 SDK no longer runs for MTP test projects.
+- `global.json` at the repo root opts `dotnet test` into MTP mode. It is required: without it `dotnet test` falls back to VSTest and fails. `Dockerfile` and `Dockerfile.image` copy it into the build context for the same reason.
 - `SonarQubeTestProject=true` is set in the unit test csproj for SonarQube test-project classification.
 
 **Mocking Library:**
-- FakeItEasy 8.3.0 (unit test project only — the integration test project has no mocking library, it exercises real objects).
+- FakeItEasy 9.0.1 (unit test project only — the integration test project has no mocking library, it exercises real objects).
 
 **Assertion Library:**
 - xUnit's built-in `Assert` class (`Assert.Equal`, `Assert.True`, `Assert.NotNull`, `Assert.Contains`, `Assert.Single`, `Assert.Empty`, `Assert.ThrowsAny<Exception>`, `Assert.DoesNotContain`).
 
 **Run Commands:**
 ```bash
-dotnet test Tests/AWSRedrive.Tests.Unit/AWSRedrive.Tests.Unit.csproj -c Debug   # unit tests (via Makefile: make test)
+dotnet test --project Tests/AWSRedrive.Tests.Unit/AWSRedrive.Tests.Unit.csproj -c Debug   # unit tests (via Makefile: make test)
 dotnet watch test --project Tests/AWSRedrive.Tests.Unit/AWSRedrive.Tests.Unit.csproj  # watch mode (make test-watch)
-dotnet test Tests/AWSRedrive.Test.Integration/AWSRedrive.Test.Integration.csproj -c Debug  # integration tests (make integration-test)
-dotnet test Tests/AWSRedrive.Test.Integration/AWSRedrive.Test.Integration.csproj --filter "Speed!=Slow"  # 19 of 28 (make integration-test-fast)
+dotnet test --project Tests/AWSRedrive.Test.Integration/AWSRedrive.Test.Integration.csproj -c Debug  # integration tests (make integration-test)
+dotnet test --project Tests/AWSRedrive.Test.Integration/AWSRedrive.Test.Integration.csproj --filter-not-trait "Speed=Slow"  # 19 of 28 (make integration-test-fast)
 ```
+MTP requires `--project`; a bare `dotnet test <path>` now exits 1 with "Specifying a project for 'dotnet test' should be via '--project'".
+
 The integration suite needs its container stack running first — `integration-infrastructure/start.ps1`, torn down with `stop.ps1` (`make integration-up` / `make integration-down`). If it is not up, `StackPreflight` fails the run once with instructions rather than letting every test time out on a socket.
 
 No coverage tooling (Coverlet/ReportGenerator) or CI pipeline config detected in the repo — coverage is not automated or enforced.
