@@ -47,7 +47,7 @@ Here are the elements of a configuration entry:
 * **Timeout**. Service timeout in milliseconds to observe when sending messages to the configured service endpoint.
 * **IgnoreCertificateErrors**. If set to True, AWSRedrive will ignore any certificate errors when connecting to the configured service endpoint.
 * **UnpackAttributesAsHeaders**. If set to True, AWSRedrive will try to treat the incoming message as being an [SNS envelope](https://docs.aws.amazon.com/sns/latest/dg/sns-message-and-json-formats.html), then unpack message attributes and transfer them as HTTP headers.
-* **ServiceUrl**. If configured, this value will be passed to the ServiceURL property of the AWS SDK. This is useful when working with [LocalStack](https://localstack.cloud/) instead of AWS.
+* **ServiceUrl**. If configured, this value will be passed to the ServiceURL property of the AWS SDK. This is useful when working with an SQS emulator instead of real AWS, such as [LocalStack](https://localstack.cloud/) or [Floci](https://floci.io/aws/) — the integration suite uses this setting to point AWSRedrive at Floci. Note that when ServiceUrl is set, Region is ignored for endpoint resolution; the AWS SDK may still need a region for request signing, supplied via the AWS_REGION environment variable.
 * **LogLevel**. The log level for this entry (Trace, Debug, Info, Warn, Error, Fatal). If not specified, uses the global `DefaultLogLevel` from appsettings.json.
 
 ## Application Settings
@@ -208,6 +208,32 @@ make image-push DOCKER_REGISTRY=ghcr.io/user DOCKER_TAG=1.0.0
 | `RUNTIME` | auto-detected | Target runtime (linux-x64, linux-arm64, osx-arm64, win-x64) |
 | `BUILD_RUNTIME` | linux-x64 | Target for docker-build-* commands |
 | `CONFIG` | Release | Build configuration |
+
+### Integration Tests
+
+The integration suite runs against a Docker stack: an SQS emulator, Kafka, a
+recording sink service and AWSRedrive itself. Bring the stack up first, then run
+the tests from Visual Studio or the CLI.
+
+```powershell
+cd integration-infrastructure
+./start.ps1
+dotnet test Tests/AWSRedrive.Test.Integration
+./stop.ps1
+```
+
+The 28 tests cover HTTP verb selection, the three authentication modes, header
+and SNS attribute propagation, timeout/500/DLQ retry behaviour, TLS certificate
+handling, the Kafka destination, runtime config reload, and dashboard metrics.
+`make integration-test-fast` skips the nine slow ones.
+
+While the stack is up, the redrive dashboard is on <http://localhost:5000> and
+every container's logs are browsable at <http://localhost:9999>.
+
+The test project has no Docker dependency of its own; it talks to fixed host
+ports, so the stack can be started from a terminal and the tests run and debugged
+from Visual Studio. See `integration-infrastructure/README.md` for the port table
+and how the tests stay isolated from each other.
 
 ## Running with Docker
 

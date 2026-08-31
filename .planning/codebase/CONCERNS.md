@@ -135,13 +135,15 @@
 ## Test Coverage Gaps
 
 **PowerShell and Kafka message processors lack dedicated unit tests:**
-- What's not tested: `Projects/AWSRedrive/PowershellMessageProcessor.cs` and `Projects/AWSRedrive/KafkaMessageProcessor.cs` have no `PowerShellMessageProcessorTests.cs` / `KafkaMessageProcessorTests.cs`. They are only indirectly referenced via `Tests/AWSRedrive.Tests.Unit/MessageProcessorFactoryTests.cs`, which tests factory selection logic, not actual message-processing behavior (script execution, error handling, Kafka produce failure/timeout paths).
+- What's not tested: `Projects/AWSRedrive/PowershellMessageProcessor.cs` and `Projects/AWSRedrive/KafkaMessageProcessor.cs` have no `PowerShellMessageProcessorTests.cs` / `KafkaMessageProcessorTests.cs`. They are only indirectly referenced via `Tests/AWSRedrive.Tests.Unit/MessageProcessorFactoryTests.cs`, which tests factory selection logic, not actual message-processing behavior.
+- Partially addressed (2026-08-30): `Tests/AWSRedrive.Test.Integration/KafkaSinkTests.cs` now covers the Kafka **happy** paths end to end against a real broker — produce, Snappy compression, and the fact that SQS attributes are not carried across. The Kafka **failure** branches (timeout, `ProduceException`, non-persisted status) remain unverified, as does everything in the PowerShell processor: `RedriveScript` is excluded from the integration suite by decision.
 - Files: `Projects/AWSRedrive/PowershellMessageProcessor.cs`, `Projects/AWSRedrive/KafkaMessageProcessor.cs`
-- Risk: Error-handling branches (script not found, script throws, script produces warnings; Kafka timeout, `ProduceException`, non-persisted status) are unverified by automated tests and could regress silently.
+- Risk: Error-handling branches (script not found, script throws, script produces warnings; Kafka timeout, `ProduceException`, non-persisted status) could regress silently.
 - Priority: Medium — these are less commonly used redrive paths than HTTP but still production-critical for the queues that rely on them.
 
 **`async void` delete-failure path is untested:**
 - What's not tested: There is no test verifying behavior when `AwsQueueClient.DeleteMessage` throws asynchronously after the SQS call is issued (see Known Bugs / Tech Debt above regarding `async void`).
+- Partially addressed (2026-08-30): `FailureAndRetryTests.ASuccessfullyDeliveredMessageIsRemovedFromItsQueue` exercises the delete path for real — it asserts the queue drains and the message is not redelivered. That covers the success path only; the failure path is still unverified.
 - Files: `Projects/AWSRedrive/AwsQueueClient.cs:105-119`, `Tests/AWSRedrive.Tests.Unit/AwsQueueClientTests.cs`
 - Risk: A silent process crash or missed error metric on delete failure could go unnoticed until it happens in production.
 - Priority: High — directly tied to a real correctness bug identified above.

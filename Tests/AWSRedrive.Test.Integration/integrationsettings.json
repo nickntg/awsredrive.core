@@ -1,0 +1,14 @@
+{
+  "SinkHttpUrl": "http://localhost:8080",
+  "SinkHttpsUrl": "https://localhost:8443",
+  "DashboardUrl": "http://localhost:5000",
+  "FlociUrl": "http://localhost:4566",
+  "AccountId": "000000000000",
+  "Region": "us-east-1",
+  "AccessKey": "test",
+  "SecretKey": "test",
+  "ExpectedAuthToken": "Bearer it-integration-token",
+  "ExpectedApiKey": "it-integration-api-key",
+  "ExpectedBasicUser": "it-user",
+  "ExpectedBasicPassword": "it-password"
+}

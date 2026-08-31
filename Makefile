@@ -28,9 +28,10 @@ BUILD_RUNTIME ?= linux-x64
 CONSOLE = Projects/AWSRedrive.console/AWSRedrive.console.csproj
 SERVICE = Projects/AWSRedrive.LinuxService/AWSRedrive.LinuxService.csproj
 TESTS = Tests/AWSRedrive.Tests.Unit/AWSRedrive.Tests.Unit.csproj
+INTEGRATION = Tests/AWSRedrive.Test.Integration/AWSRedrive.Test.Integration.csproj
 PUBLISH = -c $(CONFIG) -r $(RUNTIME) --self-contained -p:PublishSingleFile=true -p:PublishTrimmed=false
 
-.PHONY: run watch test console service all sign image image-push clean help
+.PHONY: run watch test console service all sign image image-push clean help integration-up integration-down integration-test integration-test-fast
 
 help:
 	@echo "Development:  run, watch, test, test-watch, logs"
@@ -38,6 +39,7 @@ help:
 	@echo "Docker SDK:   docker-build-console, docker-build-service, docker-build-all, docker-test"
 	@echo "Docker:       docker-console, docker-service, image, image-push, image-run"
 	@echo "macOS:        sign"
+	@echo "Integration:  integration-up, integration-test, integration-test-fast, integration-down"
 	@echo "Options:      RUNTIME=$(RUNTIME) CONFIG=$(CONFIG) BUILD_RUNTIME=$(BUILD_RUNTIME)"
 
 # Development
@@ -110,6 +112,18 @@ image-push:
 	docker push $(FULL_IMAGE):$(DOCKER_TAG)
 image-run:
 	docker run --rm -it -v $(PWD)/config.json:/app/config.json:ro -v $(PWD)/appsettings.json:/app/appsettings.json:ro -p 5000:5000 $(FULL_IMAGE):$(DOCKER_TAG)
+
+# Integration tests
+# The stack is started separately and on purpose - the tests themselves have no
+# Docker dependency. See integration-infrastructure/README.md.
+integration-up:
+	pwsh -File integration-infrastructure/start.ps1
+integration-down:
+	pwsh -File integration-infrastructure/stop.ps1
+integration-test:
+	dotnet test $(INTEGRATION) -c Debug
+integration-test-fast:
+	dotnet test $(INTEGRATION) -c Debug --filter "Speed!=Slow"
 
 # Clean
 clean:

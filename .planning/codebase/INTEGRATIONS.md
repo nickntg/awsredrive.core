@@ -9,7 +9,7 @@
   - SDK/Client: `AWSSDK.SQS` 4.0.3.7 (`Amazon.SQS.AmazonSQSClient`), wrapped in `Projects/AWSRedrive/AwsQueueClient.cs`
   - Auth: per-entry `AccessKey`/`SecretKey`, named `Profile`, or default AWS SDK credential chain (env vars / instance profile / shared credentials file) — none read directly from `.env`
   - Long-polls via `ReceiveMessageAsync` (20s wait), deletes via `DeleteMessageAsync`, and reads the `RedrivePolicy` queue attribute via `GetQueueAttributesAsync` to auto-discover the DLQ URL
-  - Supports custom `ServiceUrl` override to point at LocalStack instead of real AWS (`Projects/AWSRedrive/AwsQueueClient.cs`)
+  - Supports custom `ServiceUrl` override to point at an SQS emulator instead of real AWS (`Projects/AWSRedrive/AwsQueueClient.cs`). `Init()` sets `ServiceURL` *or* `RegionEndpoint`, never both, so `Region` is ignored once `ServiceUrl` is set — the SDK may still need `AWS_REGION` for signing. The integration suite exercises this path against Floci (`integration-infrastructure/`).
 
 **Generic HTTP(S) / AWS API Gateway (redrive target):**
 - Any HTTP(S) backend endpoint - target of "redrive" delivery

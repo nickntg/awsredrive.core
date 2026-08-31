@@ -31,10 +31,20 @@ awsredrive.core/
 │   ├── AWSRedrive.Tests.Unit/        # xUnit/NUnit-style unit tests, one file per class under test
 │   │   ├── Helpers/                  # Test doubles (e.g. SimpleConfigurationReader)
 │   │   └── AWSRedrive.Tests.Unit.csproj
-│   └── AWSRedrive.Test.Integration/  # Integration tests (e.g. against LocalStack SQS)
+│   └── AWSRedrive.Test.Integration/  # Docker-backed integration suite (28 tests)
+│       ├── Infrastructure/           # Sink/queue clients, settings, preflight fixture
+│       ├── integrationsettings.json  # Endpoints; env-var overridable
 │       └── AWSRedrive.Test.Integration.csproj
+├── integration-infrastructure/       # The container stack the integration suite runs against
+│   ├── docker-compose.yml            # floci, kafka, sink, redrive, dozzle + 2 init containers
+│   ├── start.ps1 / stop.ps1          # CLI entry points; lifecycle is manual, not test-driven
+│   ├── .env                          # Ports and image tags
+│   ├── floci/ kafka/                 # Queue and topic seed scripts
+│   ├── redrive/                      # config.json, appsettings.json, NLog.config for the SUT
+│   └── sink/                         # Recording sink service (Python/FastAPI) + Dockerfile
 ├── Solutions/
 │   └── AWSRedrive.Core.sln           # Visual Studio solution referencing all five projects
+├── docs/superpowers/                 # Design specs and implementation plans
 ├── appsettings.json                  # App-wide settings: Dashboard, Metrics, DefaultLogLevel
 ├── config.json                       # Redrive configuration entries (queue → destination mappings)
 ├── Dockerfile                        # Multi-stage build producing self-contained console/service images
@@ -86,8 +96,14 @@ awsredrive.core/
 - Contains: Test classes plus a `Helpers/` folder for test doubles (e.g. `SimpleConfigurationReader.cs`)
 
 **`Tests/AWSRedrive.Test.Integration/`:**
-- Purpose: Slower tests exercising real or emulated external dependencies (e.g. SQS via LocalStack)
-- Contains: `IntegrationTests.cs`
+- Purpose: End-to-end tests against a running container stack - SQS in, HTTP and Kafka out
+- Contains: eight `*Tests.cs` files grouped by behaviour (verbs, auth, headers, retry, TLS, Kafka, config reload, dashboard) plus an `Infrastructure/` folder of clients and fixtures
+- Requires the stack to be running first (`integration-infrastructure/start.ps1`); it holds no Docker dependency of its own
+
+**`integration-infrastructure/`:**
+- Purpose: Every container the integration suite needs, plus the scripts that start and stop them
+- Contains: `docker-compose.yml`, `start.ps1`/`stop.ps1`, `.env`, per-service subfolders, and its own `README.md`
+- Lifecycle is deliberately manual and separate from `dotnet test` - the stack is started from a terminal, then tests run from Visual Studio or the CLI
 
 **`Solutions/`:**
 - Purpose: Holds the single `.sln` file referencing all five projects (core library, two hosts, two test projects)
@@ -117,7 +133,11 @@ awsredrive.core/
 **Testing:**
 - `Tests/AWSRedrive.Tests.Unit/`: One `*Tests.cs` file per production class (e.g. `OrchestratorTests.cs`, `QueueProcessorFactoryTests.cs`, `HttpMessageProcessorTests.cs`)
 - `Tests/AWSRedrive.Tests.Unit/Helpers/SimpleConfigurationReader.cs`: Test double for `IConfigurationReader`
-- `Tests/AWSRedrive.Test.Integration/IntegrationTests.cs`: Integration-level tests
+- `Tests/AWSRedrive.Test.Integration/Infrastructure/SinkClient.cs`: Polls the sink for deliveries by correlation id
+- `Tests/AWSRedrive.Test.Integration/Infrastructure/StackPreflight.cs`: Assembly fixture; fails with instructions when the stack is down
+- `integration-infrastructure/redrive/config.json`: The 17 aliases the integration suite exercises
+- `integration-infrastructure/sink/app.py`: Recording sink - HTTP + Kafka recorder, auth challenges, config admin
+- `integration-infrastructure/README.md`: How the stack fits together and how tests stay isolated
 
 ## Naming Conventions
 
