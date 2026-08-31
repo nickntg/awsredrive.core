@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -31,7 +31,7 @@ namespace AWSRedrive.Tests.Unit
         }
 
         [Fact]
-        public void StartAndStop_DoesNotThrow()
+        public async Task StartAndStop_DoesNotThrow()
         {
             var configReader = new SimpleConfigurationReader
             {
@@ -39,10 +39,10 @@ namespace AWSRedrive.Tests.Unit
             };
             var server = new DashboardServer(configReader, CreateSettings(5002));
 
-            var exception = Record.Exception(() =>
+            var exception = await Record.ExceptionAsync(async () =>
             {
                 server.Start();
-                Task.Delay(500).Wait();
+                await Task.Delay(500, TestContext.Current.CancellationToken);
                 server.Stop();
             });
 
@@ -58,15 +58,15 @@ namespace AWSRedrive.Tests.Unit
             };
             var server = new DashboardServer(configReader, CreateSettings(5003));
             server.Start();
-            await Task.Delay(1000);
+            await Task.Delay(1000, TestContext.Current.CancellationToken);
 
             try
             {
                 using var client = new HttpClient();
-                var response = await client.GetAsync("http://localhost:5003/");
+                var response = await client.GetAsync("http://localhost:5003/", TestContext.Current.CancellationToken);
 
                 Assert.True(response.IsSuccessStatusCode);
-                var content = await response.Content.ReadAsStringAsync();
+                var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
                 Assert.Contains("AWSRedrive", content);
                 Assert.Contains("<!DOCTYPE html>", content);
             }
@@ -95,15 +95,15 @@ namespace AWSRedrive.Tests.Unit
             };
             var server = new DashboardServer(configReader, CreateSettings(5004));
             server.Start();
-            await Task.Delay(1000);
+            await Task.Delay(1000, TestContext.Current.CancellationToken);
 
             try
             {
                 using var client = new HttpClient();
-                var response = await client.GetAsync("http://localhost:5004/api/status");
+                var response = await client.GetAsync("http://localhost:5004/api/status", TestContext.Current.CancellationToken);
 
                 Assert.True(response.IsSuccessStatusCode);
-                var content = await response.Content.ReadAsStringAsync();
+                var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
                 Assert.Contains("test-alias", content);
                 Assert.Contains("eu-west-1", content);
             }
@@ -138,13 +138,13 @@ namespace AWSRedrive.Tests.Unit
             };
             var server = new DashboardServer(configReader, CreateSettings(5005));
             server.Start();
-            await Task.Delay(1000);
+            await Task.Delay(1000, TestContext.Current.CancellationToken);
 
             try
             {
                 using var client = new HttpClient();
-                var response = await client.GetAsync("http://localhost:5005/api/status");
-                var content = await response.Content.ReadAsStringAsync();
+                var response = await client.GetAsync("http://localhost:5005/api/status", TestContext.Current.CancellationToken);
+                var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
                 Assert.DoesNotContain("AKIAIOSFODNN7EXAMPLE", content);
                 Assert.DoesNotContain("wJalrXUtnFEMI", content);
@@ -187,13 +187,13 @@ namespace AWSRedrive.Tests.Unit
 
             var server = new DashboardServer(configReader, CreateSettings(5006));
             server.Start();
-            await Task.Delay(1000);
+            await Task.Delay(1000, TestContext.Current.CancellationToken);
 
             try
             {
                 using var client = new HttpClient();
-                var response = await client.GetAsync("http://localhost:5006/api/status");
-                var content = await response.Content.ReadAsStringAsync();
+                var response = await client.GetAsync("http://localhost:5006/api/status", TestContext.Current.CancellationToken);
+                var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
                 Assert.Contains("100", content);
                 Assert.Contains("95", content);

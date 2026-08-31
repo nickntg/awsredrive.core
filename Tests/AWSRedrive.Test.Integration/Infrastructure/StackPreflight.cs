@@ -10,7 +10,7 @@ public sealed class StackPreflight : IAsyncLifetime
 {
     public TestEnvironment Environment { get; } = TestEnvironment.Instance;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
 
@@ -58,7 +58,7 @@ public sealed class StackPreflight : IAsyncLifetime
         }
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 
 /// <summary>
