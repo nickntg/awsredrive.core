@@ -6,7 +6,7 @@
 
 **AWS SQS (source queue):**
 - Amazon SQS - polled as the source of messages to redrive
-  - SDK/Client: `AWSSDK.SQS` 4.0.3.7 (`Amazon.SQS.AmazonSQSClient`), wrapped in `Projects/AWSRedrive/AwsQueueClient.cs`
+  - SDK/Client: `AWSSDK.SQS` 4.0.100.11 (`Amazon.SQS.AmazonSQSClient`), wrapped in `Projects/AWSRedrive/AwsQueueClient.cs`
   - Auth: per-entry `AccessKey`/`SecretKey`, named `Profile`, or default AWS SDK credential chain (env vars / instance profile / shared credentials file) — none read directly from `.env`
   - Long-polls via `ReceiveMessageAsync` (20s wait), deletes via `DeleteMessageAsync`, and reads the `RedrivePolicy` queue attribute via `GetQueueAttributesAsync` to auto-discover the DLQ URL
   - Supports custom `ServiceUrl` override to point at an SQS emulator instead of real AWS (`Projects/AWSRedrive/AwsQueueClient.cs`). `Init()` sets `ServiceURL` *or* `RegionEndpoint`, never both, so `Region` is ignored once `ServiceUrl` is set — the SDK may still need `AWS_REGION` for signing. The integration suite exercises this path against Floci (`integration-infrastructure/`).
@@ -20,13 +20,13 @@
 
 **Apache Kafka (redrive target):**
 - Kafka cluster - alternate redrive delivery target
-  - SDK/Client: `Confluent.Kafka` 2.14.2, implemented in `Projects/AWSRedrive/KafkaMessageProcessor.cs`
+  - SDK/Client: `Confluent.Kafka` 2.15.0, implemented in `Projects/AWSRedrive/KafkaMessageProcessor.cs`
   - Auth: none built in beyond `KafkaBootstrapServers`/`KafkaClientId` config; relies on librdkafka defaults (no SASL/TLS config surfaced in `ConfigurationEntry`)
   - Producer configured with `Acks.All`, optional Snappy compression (`UseKafkaCompression`)
 
 **PowerShell script execution (redrive target):**
 - Local PowerShell scripts - alternate redrive delivery target (not a network integration, but an external process/runtime integration)
-  - SDK/Client: `Microsoft.PowerShell.SDK` 7.4.6 embedded runtime (`System.Management.Automation`), implemented in `Projects/AWSRedrive/PowershellMessageProcessor.cs`
+  - SDK/Client: `Microsoft.PowerShell.SDK` 7.6.5 embedded runtime (`System.Management.Automation`), implemented in `Projects/AWSRedrive/PowershellMessageProcessor.cs`
   - Invokes a user-provided `.ps1` file path (`RedriveScript`), passing message content and attributes as script parameters
 
 ## Data Storage
@@ -57,7 +57,7 @@
 - None (no Sentry/Application Insights/Datadog integration). Errors are logged via NLog and surfaced in the in-memory `MetricsStore` (`Projects/AWSRedrive/MetricsStore.cs`, `Projects/AWSRedrive/MetricsSettingsProvider.cs`) and exposed through the dashboard `/api/status` endpoint.
 
 **Logs:**
-- NLog 6.1.3, JSON-layout structured logs written to console and to `${basedir}/logs/awsredrive.log` (daily rolling, 7-file retention) — `Projects/AWSRedrive/NLog.config`, `Projects/AWSRedrive.console/NLog.config`, `Projects/AWSRedrive.LinuxService/NLog.config`
+- NLog 6.2.0, JSON-layout structured logs written to console and to `${basedir}/logs/awsredrive.log` (daily rolling, 7-file retention) — `Projects/AWSRedrive/NLog.config`, `Projects/AWSRedrive.console/NLog.config`, `Projects/AWSRedrive.LinuxService/NLog.config`
 - Per-queue log level is configurable at runtime via the dashboard API (`POST /api/loglevel/{alias}?level=...`) and stored per `ConfigurationEntry.LogLevel`, managed by `Projects/AWSRedrive/EntryLogger.cs`
 - ASP.NET Core/Kestrel logs for the dashboard server are routed through NLog (`builder.Host.UseNLog()` in `DashboardServer.cs`)
 
