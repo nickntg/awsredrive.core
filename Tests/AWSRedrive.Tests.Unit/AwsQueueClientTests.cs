@@ -18,9 +18,9 @@ namespace AWSRedrive.Tests.Unit
             var mockSqsClient = A.Fake<IAmazonSQS>();
             var response = new ReceiveMessageResponse
             {
-                Messages = new List<Message>
-                {
-                    new Message
+                Messages =
+                [
+                    new()
                     {
                         MessageId = "test-message-id",
                         ReceiptHandle = "test-handle",
@@ -28,7 +28,7 @@ namespace AWSRedrive.Tests.Unit
                         MessageAttributes = null, // SDK 4.x can return null
                         Attributes = null // SDK 4.x can return null
                     }
-                }
+                ]
             };
 
             A.CallTo(() => mockSqsClient.ReceiveMessageAsync(
@@ -64,9 +64,9 @@ namespace AWSRedrive.Tests.Unit
             var mockSqsClient = A.Fake<IAmazonSQS>();
             var response = new ReceiveMessageResponse
             {
-                Messages = new List<Message>
-                {
-                    new Message
+                Messages =
+                [
+                    new()
                     {
                         MessageId = "test-message-id",
                         ReceiptHandle = "test-handle",
@@ -74,7 +74,7 @@ namespace AWSRedrive.Tests.Unit
                         MessageAttributes = new Dictionary<string, MessageAttributeValue>(),
                         Attributes = new Dictionary<string, string>()
                     }
-                }
+                ]
             };
 
             A.CallTo(() => mockSqsClient.ReceiveMessageAsync(
@@ -107,9 +107,9 @@ namespace AWSRedrive.Tests.Unit
             var mockSqsClient = A.Fake<IAmazonSQS>();
             var response = new ReceiveMessageResponse
             {
-                Messages = new List<Message>
-                {
-                    new Message
+                Messages =
+                [
+                    new()
                     {
                         MessageId = "test-message-id",
                         ReceiptHandle = "test-handle",
@@ -123,7 +123,7 @@ namespace AWSRedrive.Tests.Unit
                             { "SentTimestamp", "1234567890" }
                         }
                     }
-                }
+                ]
             };
 
             A.CallTo(() => mockSqsClient.ReceiveMessageAsync(
@@ -158,9 +158,9 @@ namespace AWSRedrive.Tests.Unit
             var mockSqsClient = A.Fake<IAmazonSQS>();
             var response = new ReceiveMessageResponse
             {
-                Messages = new List<Message>
-                {
-                    new Message
+                Messages =
+                [
+                    new()
                     {
                         MessageId = "test-message-id",
                         ReceiptHandle = "test-handle",
@@ -171,7 +171,7 @@ namespace AWSRedrive.Tests.Unit
                             { "SentTimestamp", "1234567890" }
                         }
                     }
-                }
+                ]
             };
 
             A.CallTo(() => mockSqsClient.ReceiveMessageAsync(
@@ -227,7 +227,136 @@ namespace AWSRedrive.Tests.Unit
             // Assert
             Assert.Null(message);
         }
+
+        [Fact]
+        public void DeleteMessage_WhenSqsCallFails_ThrowsToCaller()
+        {
+            // Arrange
+            var mockSqsClient = A.Fake<IAmazonSQS>();
+
+            A.CallTo(() => mockSqsClient.DeleteMessageAsync(
+                A<DeleteMessageRequest>.Ignored,
+                A<CancellationToken>.Ignored))
+                .Returns(Task.FromException<DeleteMessageResponse>(
+                    new AmazonSQSException("throttled")));
+
+            var client = new TestableAwsQueueClient(mockSqsClient)
+            {
+                ConfigurationEntry = new ConfigurationEntry
+                {
+                    QueueUrl = "https://sqs.test.amazonaws.com/test-queue",
+                    Region = "eu-central-1"
+                }
+            };
+
+            var message = new SqsMessage("test-message-id", "test-handle", "test-body", null);
+
+            var ex = Assert.Throws<AmazonSQSException>(() => client.DeleteMessage(message));
+            Assert.Equal("throttled", ex.Message);
+        }
+
+        [Fact]
+        public void DeleteMessage_WhenCancellationTimeoutElapses_ThrowsToCaller()
+        {
+            // Arrange
+            var mockSqsClient = A.Fake<IAmazonSQS>();
+
+            A.CallTo(() => mockSqsClient.DeleteMessageAsync(
+                A<DeleteMessageRequest>.Ignored,
+                A<CancellationToken>.Ignored))
+                .Returns(Task.FromException<DeleteMessageResponse>(
+                    new TaskCanceledException()));
+
+            var client = new TestableAwsQueueClient(mockSqsClient)
+            {
+                ConfigurationEntry = new ConfigurationEntry
+                {
+                    QueueUrl = "https://sqs.test.amazonaws.com/test-queue",
+                    Region = "eu-central-1"
+                }
+            };
+
+            var message = new SqsMessage("test-message-id", "test-handle", "test-body", null);
+
+            // Act / Assert
+            Assert.Throws<TaskCanceledException>(() => client.DeleteMessage(message));
+        }
+
+        [Fact]
+        public void DeleteMessage_DoesNotReturnBeforeDeleteCompletes()
+        {
+            // Arrange
+            var mockSqsClient = A.Fake<IAmazonSQS>();
+            var deleteCompleted = false;
+
+            A.CallTo(() => mockSqsClient.DeleteMessageAsync(
+                A<DeleteMessageRequest>.Ignored,
+                A<CancellationToken>.Ignored))
+                .ReturnsLazily(CompleteAfterDelay);
+
+            async Task<DeleteMessageResponse> CompleteAfterDelay()
+            {
+                await Task.Delay(200);
+                deleteCompleted = true;
+                return new DeleteMessageResponse();
+            }
+
+            var client = new TestableAwsQueueClient(mockSqsClient)
+            {
+                ConfigurationEntry = new ConfigurationEntry
+                {
+                    QueueUrl = "https://sqs.test.amazonaws.com/test-queue",
+                    Region = "eu-central-1"
+                }
+            };
+
+            var message = new SqsMessage("test-message-id", "test-handle", "test-body", null);
+
+            // Act
+            client.DeleteMessage(message);
+
+            // Assert
+            Assert.True(deleteCompleted, "DeleteMessage returned before the SQS delete completed");
+        }
+
+        [Fact]
+        public void DeleteMessage_OnSuccess_SendsQueueUrlAndReceiptHandle()
+        {
+            // Arrange
+            var mockSqsClient = A.Fake<IAmazonSQS>();
+            DeleteMessageRequest capturedRequest = null;
+
+            A.CallTo(() => mockSqsClient.DeleteMessageAsync(
+                A<DeleteMessageRequest>.Ignored,
+                A<CancellationToken>.Ignored))
+                .Invokes((DeleteMessageRequest request, CancellationToken _) => capturedRequest = request)
+                .Returns(Task.FromResult(new DeleteMessageResponse()));
+
+            var client = new TestableAwsQueueClient(mockSqsClient)
+            {
+                ConfigurationEntry = new ConfigurationEntry
+                {
+                    QueueUrl = "https://sqs.test.amazonaws.com/test-queue",
+                    Region = "eu-central-1"
+                }
+            };
+
+            var message = new SqsMessage("test-message-id", "test-handle", "test-body", null);
+
+            // Act
+            client.DeleteMessage(message);
+
+            // Assert
+            A.CallTo(() => mockSqsClient.DeleteMessageAsync(
+                A<DeleteMessageRequest>.Ignored,
+                A<CancellationToken>.Ignored))
+                .MustHaveHappenedOnceExactly();
+            Assert.NotNull(capturedRequest);
+            Assert.Equal("https://sqs.test.amazonaws.com/test-queue", capturedRequest.QueueUrl);
+            Assert.Equal("test-handle", capturedRequest.ReceiptHandle);
+        }
     }
+
 
     /// <summary>
     /// Testable version of AwsQueueClient that allows injecting a mock IAmazonSQS
@@ -236,7 +365,7 @@ namespace AWSRedrive.Tests.Unit
     {
         public TestableAwsQueueClient(IAmazonSQS mockClient)
         {
-            _client = mockClient;
+            Client = mockClient;
         }
     }
 }
