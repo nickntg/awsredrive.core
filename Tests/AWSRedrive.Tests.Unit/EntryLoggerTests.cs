@@ -1,4 +1,3 @@
-using AWSRedrive;
 using Xunit;
 
 namespace AWSRedrive.Tests.Unit

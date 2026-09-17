@@ -5,24 +5,29 @@
 ## Test Framework
 
 **Runner:**
-- xUnit 2.9.2 (`xunit` + `xunit.runner.visualstudio` 2.8.2 packages) in both test projects.
+- xUnit v3 4.0.0 (`xunit.v3` package) in both test projects, running on Microsoft.Testing.Platform (MTP).
 - Config: no custom `xunit.runner.json`; defaults are used. Project config: `Tests/AWSRedrive.Tests.Unit/AWSRedrive.Tests.Unit.csproj`, `Tests/AWSRedrive.Test.Integration/AWSRedrive.Test.Integration.csproj`.
-- Both test projects target `net8.0` and reference `Microsoft.NET.Test.Sdk` 17.11.1.
+- Both test projects target `net10.0` and set `OutputType=Exe` — a v3 test project is a self-hosting executable, not a library loaded by an external runner.
+- There is no `Microsoft.NET.Test.Sdk` or `xunit.runner.visualstudio` reference. Both exist only to host tests under VSTest, which the .NET 10 SDK no longer runs for MTP test projects.
+- `global.json` at the repo root opts `dotnet test` into MTP mode. It is required: without it `dotnet test` falls back to VSTest and fails. `Dockerfile` and `Dockerfile.image` copy it into the build context for the same reason.
+- Visual Studio Test Explorer discovers these tests through MTP, not the VSTest adapter, since `xunit.runner.visualstudio` is no longer referenced. A recent VS 2022 is required. If tests do not appear in Test Explorer, treat the CLI (`dotnet test --project ...`) as authoritative and check the VS version before suspecting the tests.
 - `SonarQubeTestProject=true` is set in the unit test csproj for SonarQube test-project classification.
 
 **Mocking Library:**
-- FakeItEasy 8.3.0 (unit test project only — the integration test project has no mocking library, it exercises real objects).
+- FakeItEasy 9.0.1 (unit test project only — the integration test project has no mocking library, it exercises real objects).
 
 **Assertion Library:**
 - xUnit's built-in `Assert` class (`Assert.Equal`, `Assert.True`, `Assert.NotNull`, `Assert.Contains`, `Assert.Single`, `Assert.Empty`, `Assert.ThrowsAny<Exception>`, `Assert.DoesNotContain`).
 
 **Run Commands:**
 ```bash
-dotnet test Tests/AWSRedrive.Tests.Unit/AWSRedrive.Tests.Unit.csproj -c Debug   # unit tests (via Makefile: make test)
+dotnet test --project Tests/AWSRedrive.Tests.Unit/AWSRedrive.Tests.Unit.csproj -c Debug   # unit tests (via Makefile: make test)
 dotnet watch test --project Tests/AWSRedrive.Tests.Unit/AWSRedrive.Tests.Unit.csproj  # watch mode (make test-watch)
-dotnet test Tests/AWSRedrive.Test.Integration/AWSRedrive.Test.Integration.csproj -c Debug  # integration tests (make integration-test)
-dotnet test Tests/AWSRedrive.Test.Integration/AWSRedrive.Test.Integration.csproj --filter "Speed!=Slow"  # 19 of 28 (make integration-test-fast)
+dotnet test --project Tests/AWSRedrive.Test.Integration/AWSRedrive.Test.Integration.csproj -c Debug  # integration tests (make integration-test)
+dotnet test --project Tests/AWSRedrive.Test.Integration/AWSRedrive.Test.Integration.csproj --filter-not-trait "Speed=Slow"  # 19 of 28 (make integration-test-fast)
 ```
+MTP requires `--project`; a bare `dotnet test <path>` now exits 1 with "Specifying a project for 'dotnet test' should be via '--project'".
+
 The integration suite needs its container stack running first — `integration-infrastructure/start.ps1`, torn down with `stop.ps1` (`make integration-up` / `make integration-down`). If it is not up, `StackPreflight` fails the run once with instructions rather than letting every test time out on a socket.
 
 No coverage tooling (Coverlet/ReportGenerator) or CI pipeline config detected in the repo — coverage is not automated or enforced.
@@ -154,6 +159,34 @@ A.CallTo(() => mockProcessor.Configuration).MustHaveHappenedOnceOrMore();
 - Validators (`ConfigurationEntryValidator`) and processors under direct test (`HttpMessageProcessor`) are instantiated as real objects, not faked, since they are the system under test.
 - Real network/server classes are sometimes deliberately exercised for real rather than mocked when testing integration-level behavior — `DashboardServerTests` starts a real Kestrel server on a real localhost port and issues a real `HttpClient` GET request.
 - The integration project mocks **nothing**. It runs the real published redrive binary in a container against a real SQS emulator, a real Kafka broker and a real HTTP endpoint. Adding a mocking library there would defeat its purpose.
+
+## Test Lifecycle (xUnit v3)
+
+`IAsyncLifetime` returns `ValueTask` and derives from `IAsyncDisposable`, so
+`InitializeAsync`/`DisposeAsync` are declared `ValueTask`, not `Task`
+(`Infrastructure/StackPreflight.cs`, `ConfigurationReloadTests.cs`).
+
+**The trap:** v3 follows framework guidance and calls `DisposeAsync` *instead of*
+`Dispose` when a class implements both. v2 called both. `IntegrationTest` is
+`IDisposable` and its `Dispose` releases the SQS client, so any test class that
+also implements `IAsyncLifetime` must dispose the base itself:
+
+```csharp
+public async ValueTask DisposeAsync()
+{
+    await Sink.ResetConfigAsync();
+    Dispose();          // v3 will not call this for us
+}
+```
+
+Omitting that call leaks an `AmazonSQSClient` per test while every test stays
+green — there is no failure to notice. `ConfigurationReloadTests` is currently
+the only class in this position.
+
+**Cancellation:** the `xUnit1051` analyzer requires
+`TestContext.Current.CancellationToken` on any call that accepts one, so long
+polls and waits pass it through. This is what lets a cancelled run stop promptly
+instead of blocking out a full 75-second reload wait.
 
 ## Fixtures and Factories
 

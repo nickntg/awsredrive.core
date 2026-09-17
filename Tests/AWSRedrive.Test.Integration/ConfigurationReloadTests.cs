@@ -22,10 +22,20 @@ public class ConfigurationReloadTests : IntegrationTest, IAsyncLifetime
 {
     private static readonly TimeSpan ReloadBudget = TimeSpan.FromSeconds(90);
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
 
-    /// <summary>Puts the committed configuration back, even after a failure.</summary>
-    public Task DisposeAsync() => Sink.ResetConfigAsync();
+    /// <summary>
+    /// Puts the committed configuration back, even after a failure.
+    ///
+    /// Disposes the base explicitly: xUnit v3 calls DisposeAsync *instead of*
+    /// Dispose when a class implements both, so IntegrationTest.Dispose - which
+    /// releases the SQS client - would never run for this class otherwise.
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        await Sink.ResetConfigAsync();
+        Dispose();
+    }
 
     private static JsonObject FindAlias(JsonArray config, string alias) =>
         config.OfType<JsonObject>().Single(e => (string?)e["Alias"] == alias);
@@ -120,7 +130,7 @@ public class ConfigurationReloadTests : IntegrationTest, IAsyncLifetime
         await Sink.SetConfigAsync(remaining);
 
         // Give the reconciliation loop a full cycle to stop the processor.
-        await Task.Delay(TimeSpan.FromSeconds(75));
+        await Task.Delay(TimeSpan.FromSeconds(75), TestContext.Current.CancellationToken);
 
         var after = NewCorrelation();
         await Queues.SendAsync("it-removable", JsonBody(after));

@@ -5,7 +5,7 @@
 ## Languages
 
 **Primary:**
-- C# 12 (implicit, via `net8.0` TargetFramework) - all production code in `Projects/AWSRedrive`, `Projects/AWSRedrive.console`, `Projects/AWSRedrive.LinuxService`
+- C# 14 (implicit, via `net10.0` TargetFramework) - all production code in `Projects/AWSRedrive`, `Projects/AWSRedrive.console`, `Projects/AWSRedrive.LinuxService`
 - PowerShell (consumed, not authored, by the app) - `Projects/AWSRedrive/PowershellMessageProcessor.cs` executes user-supplied `.ps1` redrive scripts via `System.Management.Automation`
 
 **Secondary:**
@@ -17,7 +17,7 @@
 ## Runtime
 
 **Environment:**
-- .NET 8.0 (`net8.0` target framework across all projects)
+- .NET 10.0 (`net10.0` target framework across all projects)
 - `Projects/AWSRedrive/AWSRedrive.csproj` (class library, core logic)
 - `Projects/AWSRedrive.console/AWSRedrive.console.csproj` (console host, `OutputType=Exe`)
 - `Projects/AWSRedrive.LinuxService/AWSRedrive.LinuxService.csproj` (Worker Service SDK, `Microsoft.NET.Sdk.Worker`, runs as systemd service via `Microsoft.Extensions.Hosting.Systemd`)
@@ -31,36 +31,36 @@
 
 **Core:**
 - ASP.NET Core minimal APIs (`Microsoft.AspNetCore.App` framework reference) - powers the embedded dashboard web server, `Projects/AWSRedrive/DashboardServer.cs` (Kestrel via `WebApplication.CreateBuilder()`)
-- Microsoft.Extensions.DependencyInjection 8.0.1 - composition root in `Projects/AWSRedrive/DI/Injector.cs`
-- Microsoft.Extensions.Hosting 8.0.1 / Hosting.Systemd 8.0.1 - generic host + systemd integration for the Linux service, `Projects/AWSRedrive.LinuxService/Program.cs`
-- Microsoft.Extensions.Configuration(.Json) 8.0.0 - binds `appsettings.json` into `Projects/AWSRedrive/Models/AppSettings.cs`
+- Microsoft.Extensions.DependencyInjection - composition root in `Projects/AWSRedrive/DI/Injector.cs`. Supplied by the `Microsoft.AspNetCore.App` shared framework; there is deliberately no explicit `PackageReference` (NU1510 - the framework already provides it)
+- Microsoft.Extensions.Hosting.Systemd 10.0.11 - generic host + systemd integration for the Linux service, `Projects/AWSRedrive.LinuxService/Program.cs`
+- Microsoft.Extensions.Configuration - binds `appsettings.json` into `Projects/AWSRedrive/Models/AppSettings.cs`; also from the shared framework
 - FluentValidation 12.1.1 - validates `ConfigurationEntry` objects, `Projects/AWSRedrive/Validations/ConfigurationEntryValidator.cs`
 
 **Testing:**
-- xUnit 2.9.2 (+ `xunit.runner.visualstudio` 2.8.2) - `Tests/AWSRedrive.Tests.Unit`, `Tests/AWSRedrive.Test.Integration`
-- FakeItEasy 8.3.0 - mocking library used throughout `Tests/AWSRedrive.Tests.Unit/*.cs`; deliberately absent from the integration project
-- Microsoft.NET.Test.Sdk 17.11.1
-- AWSSDK.SQS 4.0.3.7 - also referenced by `Tests/AWSRedrive.Test.Integration` so tests can drive the emulated queues directly
+- xUnit v3 4.0.0 (`xunit.v3`) on Microsoft.Testing.Platform - `Tests/AWSRedrive.Tests.Unit`, `Tests/AWSRedrive.Test.Integration`. Both projects are `OutputType=Exe`; `global.json` at the repo root opts `dotnet test` into MTP mode and is required
+- FakeItEasy 9.0.1 - mocking library used throughout `Tests/AWSRedrive.Tests.Unit/*.cs`; deliberately absent from the integration project
+- No `Microsoft.NET.Test.Sdk` or `xunit.runner.visualstudio` - both host tests under VSTest, which the .NET 10 SDK no longer runs for MTP test projects
+- AWSSDK.SQS 4.0.100.11 - also referenced by `Tests/AWSRedrive.Test.Integration` so tests can drive the emulated queues directly
 - Integration stack (`integration-infrastructure/`, not part of the shipped product): Floci (`floci/floci`) as an SQS emulator, Apache Kafka 3.9 in KRaft mode, a Python 3.12 / FastAPI recording sink with `confluent-kafka`, Dozzle for log browsing, and the redrive image itself built from `Dockerfile.image`. Orchestrated by `docker-compose.yml` and driven from `start.ps1` / `stop.ps1` — never from the test process.
 
 **Build/Dev:**
 - `dotnet` CLI (build/test/publish) orchestrated via `Makefile` (targets: `run`, `watch`, `test`, `console`, `service`, `all`, `docker-*`, `image`, `sign`, `integration-up`, `integration-down`, `integration-test`, `integration-test-fast`)
 - PowerShell 5.1+ - `integration-infrastructure/start.ps1` and `stop.ps1`. Both run at `$ErrorActionPreference = 'Continue'` on purpose: Windows PowerShell turns a native executable's stderr into a terminating `NativeCommandError` under `'Stop'`, and docker writes both warnings and progress there.
-- Docker multi-stage builds - `Dockerfile` (scratch-based, artifact extraction) and `Dockerfile.image` (runnable container image, `mcr.microsoft.com/dotnet/runtime-deps:8.0-noble-chiseled` base)
+- Docker multi-stage builds - `Dockerfile` (scratch-based, artifact extraction) and `Dockerfile.image` (runnable container image, `mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled` base)
 - SonarQube integration - `Tests/AWSRedrive.Tests.Unit/AWSRedrive.Tests.Unit.csproj` sets `SonarQubeTestProject=true`; `.gitignore` excludes `.sonarqube/` and `sonar*.*`
 
 ## Key Dependencies
 
 **Critical:**
-- `AWSSDK.SQS` 4.0.3.7 - core SQS polling/deleting/queue-attribute client, `Projects/AWSRedrive/AwsQueueClient.cs`
-- `Confluent.Kafka` 2.14.2 - Kafka producer for redrive-to-Kafka mode, `Projects/AWSRedrive/KafkaMessageProcessor.cs`
+- `AWSSDK.SQS` 4.0.100.11 - core SQS polling/deleting/queue-attribute client, `Projects/AWSRedrive/AwsQueueClient.cs`
+- `Confluent.Kafka` 2.15.0 - Kafka producer for redrive-to-Kafka mode, `Projects/AWSRedrive/KafkaMessageProcessor.cs`
 - `RestSharp` 114.0.0 - HTTP client for redrive-to-HTTP(S) mode, `Projects/AWSRedrive/HttpMessageProcessor.cs`
-- `Microsoft.PowerShell.SDK` 7.4.6 (+ `Microsoft.PowerShell.Commands.Diagnostics`, `Microsoft.WSMan.Management` 7.4.6) - embeds PowerShell runtime for redrive-to-script mode, `Projects/AWSRedrive/PowershellMessageProcessor.cs`
+- `Microsoft.PowerShell.SDK` 7.6.5 (+ `Microsoft.PowerShell.Commands.Diagnostics`, `Microsoft.WSMan.Management` 7.6.5) - the 7.6.x line is the one built for .NET 10 - embeds PowerShell runtime for redrive-to-script mode, `Projects/AWSRedrive/PowershellMessageProcessor.cs`
 - `FluentValidation` 12.1.1 - configuration entry validation
 - `Newtonsoft.Json` 13.0.4 - configuration file parsing (`ConfigurationReader.cs`) and SNS envelope parsing (`HttpMessageProcessor.cs`)
 
 **Infrastructure:**
-- `NLog` 6.1.3 / `NLog.Web.AspNetCore` 6.1.3 / `NLog.Extensions.Logging` 6.1.3 - structured JSON logging to console + rolling file, configured per-project via `NLog.config`
+- `NLog` 6.2.0 / `NLog.Web.AspNetCore` 6.2.0 / `NLog.Extensions.Logging` 6.2.0 - structured JSON logging to console + rolling file, configured per-project via `NLog.config`
 - `System.Text.Json` (BCL) - dashboard API JSON responses in `DashboardServer.cs`
 
 ## Configuration
@@ -81,7 +81,7 @@
 ## Platform Requirements
 
 **Development:**
-- .NET 8 SDK (`mcr.microsoft.com/dotnet/sdk:8.0` used in Docker build stages)
+- .NET 10 SDK (`mcr.microsoft.com/dotnet/sdk:10.0` used in Docker build stages)
 - `make` (GNU Make) for the convenience build/test/docker targets in `Makefile`
 - Docker (optional, for cross-platform/reproducible builds and containerized runs)
 - macOS-specific `sign` target in `Makefile` for code-signing local builds (Apple codesign, unrelated to core runtime deps)
@@ -90,7 +90,7 @@
 - Self-contained single-file binaries deployed per-platform (`linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`, `win-x64`)
 - Linux: runs as a systemd-managed background service (`AWSRedrive.LinuxService`, uses `Microsoft.Extensions.Hosting.Systemd`)
 - Any platform: runs as a foreground console app (`AWSRedrive.console`) with Ctrl+C / process-exit graceful shutdown
-- Container images published via `Dockerfile.image`, based on `mcr.microsoft.com/dotnet/runtime-deps:8.0-noble-chiseled` (minimal/chiseled Ubuntu Noble), exposing port 5000 for the embedded dashboard
+- Container images published via `Dockerfile.image`, based on `mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled` (minimal/chiseled Ubuntu Noble), exposing port 5000 for the embedded dashboard
 
 ---
 

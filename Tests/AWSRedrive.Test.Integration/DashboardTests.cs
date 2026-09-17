@@ -68,7 +68,7 @@ public class DashboardTests : IntegrationTest
                 break;
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(2));
+            await Task.Delay(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
         }
 
         Assert.True(sentAfter > sentBefore,
