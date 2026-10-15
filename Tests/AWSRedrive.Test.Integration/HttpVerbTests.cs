@@ -1,4 +1,3 @@
-using System.Text.Json;
 using AWSRedrive.Test.Integration.Infrastructure;
 using Xunit;
 

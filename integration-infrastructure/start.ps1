@@ -193,6 +193,6 @@ Write-Host "  Redrive dashboard  http://localhost:$dashPort"
 Write-Host "  Logs (Dozzle)      http://localhost:$dozzlePort" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Run the tests from Visual Studio, or:" -ForegroundColor Cyan
-Write-Host "  dotnet test Tests/AWSRedrive.Test.Integration"
+Write-Host "  dotnet test --project Tests/AWSRedrive.Test.Integration"
 Write-Host ""
 Write-Host "Tear the stack down with ./stop.ps1" -ForegroundColor Cyan

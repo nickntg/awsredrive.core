@@ -159,7 +159,7 @@ Every message-related log includes `messageId` (the SQS Message ID) as a searcha
 
 ## Building
 
-Prerequisites: .NET 8 SDK or Docker.
+Prerequisites: .NET 10 SDK or Docker.
 
 ```bash
 make help    # Show all available commands
@@ -218,7 +218,7 @@ the tests from Visual Studio or the CLI.
 ```powershell
 cd integration-infrastructure
 ./start.ps1
-dotnet test Tests/AWSRedrive.Test.Integration
+dotnet test --project Tests/AWSRedrive.Test.Integration
 ./stop.ps1
 ```
 

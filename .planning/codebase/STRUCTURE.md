@@ -47,6 +47,7 @@ awsredrive.core/
 ├── docs/superpowers/                 # Design specs and implementation plans
 ├── appsettings.json                  # App-wide settings: Dashboard, Metrics, DefaultLogLevel
 ├── config.json                       # Redrive configuration entries (queue → destination mappings)
+├── global.json                       # Opts `dotnet test` into Microsoft.Testing.Platform mode (required for xUnit v3)
 ├── Dockerfile                        # Multi-stage build producing self-contained console/service images
 ├── Dockerfile.image                  # Alternate/base image Dockerfile
 ├── Makefile                          # Build/test/publish helper targets

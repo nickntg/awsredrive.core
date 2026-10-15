@@ -89,7 +89,7 @@ public class FailureAndRetryTests : IntegrationTest
                 break;
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(2));
+            await Task.Delay(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
         }
 
         Assert.Equal(0, depth);

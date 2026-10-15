@@ -6,7 +6,7 @@ here, then run the tests from Visual Studio or the CLI.
 ```powershell
 cd integration-infrastructure
 ./start.ps1                                   # build and start; waits until ready
-dotnet test ../Tests/AWSRedrive.Test.Integration
+dotnet test --project ../Tests/AWSRedrive.Test.Integration
 ./stop.ps1                                    # containers, volumes and built images
 ```
 

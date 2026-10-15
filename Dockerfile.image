@@ -1,11 +1,15 @@
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG TARGETPLATFORM
 WORKDIR /src
+# global.json opts dotnet test into Microsoft.Testing.Platform mode. Without
+# it the test step below falls back to VSTest, which the .NET 10 SDK refuses
+# to run for xUnit v3.
+COPY global.json ./
 COPY Projects/ ./Projects/
 COPY Solutions/ ./Solutions/
 COPY Tests/ ./Tests/
 
-RUN dotnet test Tests/AWSRedrive.Tests.Unit/AWSRedrive.Tests.Unit.csproj -c Release
+RUN dotnet test --project Tests/AWSRedrive.Tests.Unit/AWSRedrive.Tests.Unit.csproj -c Release
 RUN case "$TARGETPLATFORM" in "linux/arm64") echo "linux-arm64" ;; *) echo "linux-x64" ;; esac > /tmp/runtime
 
 FROM build AS console-build
@@ -14,13 +18,13 @@ RUN dotnet publish Projects/AWSRedrive.console/AWSRedrive.console.csproj -c Rele
 FROM build AS service-build
 RUN dotnet publish Projects/AWSRedrive.LinuxService/AWSRedrive.LinuxService.csproj -c Release -r $(cat /tmp/runtime) --self-contained -p:PublishSingleFile=true -o /app
 
-FROM mcr.microsoft.com/dotnet/runtime-deps:8.0-noble-chiseled AS console-image
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled AS console-image
 WORKDIR /app
 COPY --from=console-build /app .
 EXPOSE 5000
 ENTRYPOINT ["./AWSRedrive.console"]
 
-FROM mcr.microsoft.com/dotnet/runtime-deps:8.0-noble-chiseled AS service-image
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled AS service-image
 WORKDIR /app
 COPY --from=service-build /app .
 EXPOSE 5000

@@ -123,8 +123,9 @@
 
 **`System.Management.Automation` (PowerShell SDK) dependency for `RedriveScript`:**
 - Risk: Embedding the PowerShell hosting API ties the console/service binaries to a specific PowerShell SDK version and platform behavior; cross-platform (Linux) PowerShell scripting support can have subtle differences from Windows PowerShell, and this is one of only three redrive mechanisms (HTTP, PowerShell, Kafka) with no fallback if the hosting API has compatibility issues on newer .NET/OS combinations.
-- Impact: Any breaking change in the PowerShell SDK across .NET version bumps (project currently targets .NET 8 in `Dockerfile`) could silently break all `RedriveScript`-configured queues at runtime rather than compile time, since script execution failures manifest as `InvalidOperationException` at message-processing time.
-- Migration plan: None currently documented; worth periodically validating PowerShell SDK compatibility when bumping the target framework in Docker/csproj files.
+- Impact: Any breaking change in the PowerShell SDK across .NET version bumps could silently break all `RedriveScript`-configured queues at runtime rather than compile time, since script execution failures manifest as `InvalidOperationException` at message-processing time.
+- Now concrete, not hypothetical: the .NET 8 -> 10 upgrade moved the SDK from 7.4.6 to 7.6.5 (the 7.6.x line is the one built for .NET 10). The self-contained single-file publish and the container build both succeed, and the full integration suite passes - but **none of that exercises PowerShell**. All 17 aliases in `integration-infrastructure/redrive/config.json` are HTTP or Kafka destinations; not one uses `RedriveScript`. A PowerShell runtime regression would leave every test green.
+- Migration plan: None currently documented. The cheapest real coverage would be a `RedriveScript` alias in the integration config pointing at a trivial `.ps1`, which would turn this from an untested assumption into a gate. Until then, validate script destinations by hand whenever the target framework or PowerShell SDK version moves.
 
 ## Missing Critical Features
 
