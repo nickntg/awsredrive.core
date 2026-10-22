@@ -62,13 +62,16 @@ namespace AWSRedrive
 
         private async Task<IMessage> GetMessageInternalAsync()
         {
+            const string approximateReceiveCountName = "ApproximateReceiveCount";
+            const string notSetApproximateReceiveCount = "NOT SET";
+
             var request = new ReceiveMessageRequest
             {
                 MaxNumberOfMessages = 1,
                 QueueUrl = ConfigurationEntry.QueueUrl,
                 WaitTimeSeconds = 20,
                 MessageAttributeNames = ["*"],
-                MessageSystemAttributeNames = ["SentTimestamp"]
+                MessageSystemAttributeNames = ["SentTimestamp", approximateReceiveCountName]
             };
 
             using (var source = new CancellationTokenSource(20 * 1000))
@@ -80,7 +83,11 @@ namespace AWSRedrive
                     {
                         var message = response.Messages[0];
 
-                        Logger.Trace($"Received msg id {message.MessageId} for {ConfigurationEntry.Alias}");
+                        var approximateReceiveCount =
+                            message.Attributes?.GetValueOrDefault(approximateReceiveCountName,
+                                notSetApproximateReceiveCount) ?? notSetApproximateReceiveCount;
+
+                        Logger.Trace($"Received msg id {message.MessageId} with approximate receive count {approximateReceiveCount}");
                         
                         var attributes = message.MessageAttributes?
                             .ToDictionary(item => item.Key, item => item.Value.StringValue)
