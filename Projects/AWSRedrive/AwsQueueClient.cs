@@ -1,13 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Amazon;
+﻿using Amazon;
 using Amazon.SQS;
 using Amazon.SQS.Model;
 using AWSRedrive.Interfaces;
 using AWSRedrive.Models;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace AWSRedrive
 {
@@ -16,6 +17,8 @@ namespace AWSRedrive
         public ConfigurationEntry ConfigurationEntry { get; set; }
 
         protected IAmazonSQS Client;
+
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         public void Init()
         {
@@ -54,7 +57,7 @@ namespace AWSRedrive
 
         public IMessage GetMessage()
         {
-            return GetMessageInternalAsync().Result;
+            return GetMessageInternalAsync().GetAwaiter().GetResult();
         }
 
         private async Task<IMessage> GetMessageInternalAsync()
@@ -76,6 +79,8 @@ namespace AWSRedrive
                     if (response?.Messages?.Count >= 1)
                     {
                         var message = response.Messages[0];
+
+                        Logger.Trace($"Received msg id {message.MessageId} for {ConfigurationEntry.Alias}");
                         
                         var attributes = message.MessageAttributes?
                             .ToDictionary(item => item.Key, item => item.Value.StringValue)
