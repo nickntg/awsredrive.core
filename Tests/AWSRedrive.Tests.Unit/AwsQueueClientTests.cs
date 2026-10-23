@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Amazon.SQS;
 using Amazon.SQS.Model;
+using AWSRedrive.Interfaces;
 using AWSRedrive.Models;
 using FakeItEasy;
 using Xunit;
@@ -226,6 +227,33 @@ namespace AWSRedrive.Tests.Unit
 
             // Assert
             Assert.Null(message);
+        }
+
+        [Fact]
+        public void GetMessage_WhenSqsCallFails_ThrowsToCaller()
+        {
+            // Arrange
+            var mockSqsClient = A.Fake<IAmazonSQS>();
+
+            A.CallTo(() => mockSqsClient.ReceiveMessageAsync(
+                    A<ReceiveMessageRequest>.Ignored,
+                    A<CancellationToken>.Ignored))
+                .Returns(Task.FromException<ReceiveMessageResponse>(
+                    new AmazonSQSException("error")));
+
+            var client = new TestableAwsQueueClient(mockSqsClient)
+            {
+                ConfigurationEntry = new ConfigurationEntry
+                {
+                    QueueUrl = "https://sqs.test.amazonaws.com/test-queue",
+                    Region = "eu-central-1"
+                }
+            };
+
+            var message = new SqsMessage("test-message-id", "test-handle", "test-body", null);
+
+            var ex = Assert.Throws<AmazonSQSException>(() => client.GetMessage());
+            Assert.Equal("error", ex.Message);
         }
 
         [Fact]
